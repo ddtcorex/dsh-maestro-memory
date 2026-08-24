@@ -44,7 +44,7 @@ jobs:
         run: |
           test -f lib/index.js || (echo "missing lib/index.js" && exit 1)
           test -f lib/client.js || (echo "missing lib/client.js" && exit 1)
-          test -f lib/types/index.d.ts || (echo "missing lib/types/index.d.ts" && exit 1)
+          test -f lib/index.d.ts || (echo "missing lib/index.d.ts" && exit 1)
           echo "client bundle ok:"
           ls -lh lib/client.js lib/index.js
           echo "checking bundle header..."
