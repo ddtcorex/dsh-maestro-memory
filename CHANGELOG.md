@@ -4,6 +4,27 @@ All notable changes to this project are documented in this file. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2026-08-25
+
+Fix a live gap in the `memory` tool: the `daily` track only honored an explicit
+`date` for `add`/`list`, so an entry on an older day could never be removed or
+edited through the tool (it always targeted today's file). Verified on a real
+session after restart.
+
+### Fixed
+
+- **`date` now applies to `remove`/`replace` on the `daily` track.** The store
+  methods accept an optional `{ date }` and thread it through
+  `fileFor(target, cwd, date)`, and the host tool `execute` + `memory.mutate`
+  RPC pass it through. A non-`YYYY-MM-DD` value returns an error via the
+  existing `dailyPath` → `assertDate` guard.
+- Updated the `date` schema description to cover add/list/replace/remove.
+
+### Notes
+
+- TDD regression tests added in `tests/memory-m2.spec.ts`; full suite 202 pass,
+  `pnpm run build` / `pnpm run verify` green.
+
 ## [1.0.0] - 2026-08-24
 
 Initial release of `@ddtcorex/dsh-maestro-memory`, a from-scratch TypeScript
@@ -72,3 +93,4 @@ preserves the existing `~/.dsh/memories` files in place.
   rebuild is only needed after editing `src/`.
 
 [1.0.0]: https://github.com/ddtcorex/dsh-maestro-memory/releases/tag/v1.0.0
+[1.0.1]: https://github.com/ddtcorex/dsh-maestro-memory/releases/tag/v1.0.1
