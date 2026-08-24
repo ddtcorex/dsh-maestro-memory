@@ -42,7 +42,9 @@ export declare class MaestroMemoryStore {
         error: string;
     };
     /** Replace unique entry matching substring */
-    replace(target: MemoryTarget, match: string, newContent: string, cwd?: string): {
+    replace(target: MemoryTarget, match: string, newContent: string, cwd?: string, opts?: {
+        date?: string;
+    }): {
         ok: true;
     } | {
         ok: false;
@@ -50,7 +52,9 @@ export declare class MaestroMemoryStore {
         matches?: string[];
     };
     /** Remove unique entry matching substring */
-    remove(target: MemoryTarget, match: string, cwd?: string): {
+    remove(target: MemoryTarget, match: string, cwd?: string, opts?: {
+        date?: string;
+    }): {
         ok: true;
         removed?: string;
     } | {
