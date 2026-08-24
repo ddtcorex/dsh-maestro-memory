@@ -33,7 +33,7 @@ const CONTENT_OUTPUT = {
   schema: {
     type: 'object',
     additionalProperties: false,
-    properties: { content: { type: 'array', items: { type: 'json' }, required: true } },
+    properties: { content: { type: 'array', required: true } },
   } as const,
   render: (_args: unknown, value: { content: any[] }) => value.content,
 }

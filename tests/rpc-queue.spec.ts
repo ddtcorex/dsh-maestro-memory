@@ -70,7 +70,7 @@ describe('M2-PR-B gated memory_suggest and explicit RPC', () => {
           type: 'object',
           additionalProperties: false,
           required: ['content'],
-          properties: { content: { type: 'array', items: {} } },
+          properties: { content: { type: 'array' } },
         },
         render: expect.any(Function),
       }))
