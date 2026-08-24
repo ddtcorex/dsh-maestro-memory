@@ -564,15 +564,83 @@ function TodosView({ ctx }: { ctx: any }): React.ReactElement {
   )
 }
 
+function SkillsView({ ctx }: { ctx: any }): React.ReactElement {
+  const rpc = useRpc(ctx)
+  const [entries, setEntries] = React.useState<any[]>([])
+  const [loading, setLoading] = React.useState(true)
+  const [msg, setMsg] = React.useState<string>('')
+
+  const load = React.useCallback(async () => {
+    setLoading(true)
+    setMsg('')
+    try {
+      const res: any = await rpc('skills.list', {})
+      if (res?.ok) {
+        setEntries(Array.isArray(res.entries) ? res.entries : [])
+        if (res.entries.length === 0) setMsg('No skills found (maestro-skills not installed or empty)')
+      } else {
+        setMsg(`load failed: ${res?.error ?? 'unknown'}`)
+      }
+    } catch (e: any) {
+      setMsg(`error: ${e?.message ?? String(e)}`)
+    } finally {
+      setLoading(false)
+    }
+  }, [rpc])
+
+  React.useEffect(() => {
+    load()
+  }, [load])
+
+  if (loading) return React.createElement('div', null, 'Loading skills…')
+
+  return React.createElement(
+    'div',
+    null,
+    React.createElement(
+      'div',
+      { style: { fontSize: 12, opacity: 0.7, marginBottom: 8 } },
+      `${entries.length} skills (read-only browser, metadata/origin only — maestro-skills discovery unchanged)`,
+    ),
+    entries.length === 0
+      ? React.createElement('div', { style: { opacity: 0.7, fontSize: 12 } }, msg || 'No skills')
+      : React.createElement(
+          'div',
+          null,
+          ...entries.map((e: any) =>
+            React.createElement(
+              'div',
+              { key: e.name, style: { border: '1px solid #ddd', borderRadius: 8, padding: 8, marginBottom: 8 } },
+              React.createElement('div', { style: { fontWeight: 600 } }, e.name),
+              React.createElement('div', { style: { fontSize: 12, opacity: 0.7 } }, `[${e.origin}] ${e.path}`),
+              React.createElement('div', { style: { margin: '4px 0', fontSize: 13, whiteSpace: 'pre-wrap' } }, e.description),
+              e.metadata && Object.keys(e.metadata).length > 0
+                ? React.createElement(
+                    'div',
+                    { style: { fontSize: 11, opacity: 0.6, marginTop: 4 } },
+                    `metadata: ${Object.entries(e.metadata)
+                      .map(([k, v]) => `${k}=${String(v).slice(0, 60)}`)
+                      .join(', ')}`,
+                  )
+                : null,
+            ),
+          ),
+        ),
+    msg ? React.createElement('div', { style: { marginTop: 8, fontSize: 12, color: '#333' } }, msg) : null,
+    React.createElement('button', { onClick: load, style: { marginTop: 8, padding: '4px 8px', fontSize: 12 }, 'data-testid': 'skills-refresh' }, 'Refresh'),
+    React.createElement('div', { style: { marginTop: 8, fontSize: 11, opacity: 0.6 } }, 'Read-only — model suggestions cannot change skills. Future edits, if approved, will require explicit user action + path containment.'),
+  )
+}
+
 function MemoryView({ ctx }: { ctx: any }): React.ReactElement {
-  const [tab, setTab] = React.useState<'memory' | 'review' | 'todos'>('review')
+  const [tab, setTab] = React.useState<'memory' | 'review' | 'todos' | 'skills'>('review')
   return React.createElement(
     'div',
     { style: { padding: 16, fontFamily: 'system-ui, sans-serif' } },
     React.createElement(
       'div',
-      { style: { display: 'flex', gap: 8, marginBottom: 12 } },
-      (['memory', 'review', 'todos'] as const).map((k) =>
+      { style: { display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' } },
+      (['memory', 'review', 'todos', 'skills'] as const).map((k) =>
         React.createElement(
           'button',
           {
@@ -596,7 +664,9 @@ function MemoryView({ ctx }: { ctx: any }): React.ReactElement {
       ? React.createElement('div', null, 'Memory tracks: memory / user / key / project / daily (use memory tool)')
       : tab === 'review'
         ? React.createElement(ReviewQueueView, { ctx })
-        : React.createElement(TodosView, { ctx }),
+        : tab === 'todos'
+          ? React.createElement(TodosView, { ctx })
+          : React.createElement(SkillsView, { ctx }),
   )
 }
 
