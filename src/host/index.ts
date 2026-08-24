@@ -11,7 +11,7 @@ import { appendEntryAtomicSync } from './storage/atomic-store.ts'
 import * as migration from './migration/service.ts'
 import { SyncService } from './sync/service.ts'
 import { RealGitAdapter } from './sync/git.ts'
-import { listSkillsSync, listSkills, resolveDefaultMaestroSkillsDir } from './skills-browser.ts'
+import { listSkillsSync, resolveDefaultMaestroSkillsDir } from './skills-browser.ts'
 
 export const inject = ['tools', 'systemPrompt', 'connection'] as const
 
@@ -94,6 +94,8 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
               const res = store.add(target, args.content ?? '', cwd, {
                 branches: args.branches,
                 summary: args.summary,
+                // daily add targets a specific day when the caller passes date
+                date: args.date,
               })
               if (!res.ok) return { content: [{ type: 'text', text: `add failed: ${res.error}` }] }
               return { content: [{ type: 'text', text: res.duplicate ? 'duplicate' : `added to ${target}` }] }
@@ -107,6 +109,7 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
                 recent: args.recent,
                 branch: args.branch,
                 archived: args.archived,
+                date: args.date,
               })
               const text = entries.length ? entries.join('\n---\n') : '(no entries)'
               return { content: [{ type: 'text', text }] }
@@ -346,7 +349,7 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
         case 'memory.list': {
           const target = payload?.target as string
           const cwd = payload?.cwd as string | undefined
-          const entries = store.list(target as any, cwd, payload?.opts)
+          const entries = store.list(target as any, cwd, { ...(payload?.opts ?? {}), date: payload?.date })
           return { ok: true, entries }
         }
         case 'memory.mutate': {
@@ -359,10 +362,10 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
           const opts = payload?.opts ?? {}
           try {
             if (action === 'list') {
-              return { ok: true, entries: store.list(target as any, cwd, opts) }
+              return { ok: true, entries: store.list(target as any, cwd, { ...opts, date: payload?.date }) }
             }
             if (action === 'add') {
-              return store.add(target as any, content ?? '', cwd, { branches: payload?.branches, summary: payload?.summary })
+              return store.add(target as any, content ?? '', cwd, { branches: payload?.branches, summary: payload?.summary, date: payload?.date })
             }
             if (action === 'replace') {
               return store.replace(target as any, match ?? '', content ?? '', cwd)
@@ -516,21 +519,10 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
         }
         case 'skills.list': {
           // M6 read-first: list metadata/origin only, no mutation, no body content.
-          // Payload may contain skillsDir + origin or roots array. All reads are
-          // filesystem-bound and do not alter maestro-skills discovery.
+          // Constrained to the resolved default maestro-skills checkout — the RPC
+          // must NOT honor an arbitrary client-supplied dir/roots (that would let a
+          // payload read any directory). The client sends {} and relies on the default.
           try {
-            const roots = Array.isArray(payload?.roots) ? payload.roots : undefined
-            if (roots) {
-              const entries = await listSkills({ roots: roots.map((r: any) => ({ dir: String(r.dir), origin: String(r.origin ?? 'custom') })) })
-              return { ok: true, entries }
-            }
-            const dir = typeof payload?.skillsDir === 'string' ? payload.skillsDir : (typeof payload?.dir === 'string' ? payload.dir : null)
-            const origin = typeof payload?.origin === 'string' ? payload.origin : 'custom'
-            if (dir) {
-              const entries = listSkillsSync(dir, origin)
-              return { ok: true, entries }
-            }
-            // no dir supplied: try default maestro-skills checkout for convenience
             const def = resolveDefaultMaestroSkillsDir()
             if (def) {
               const entries = listSkillsSync(def, 'maestro-skills')

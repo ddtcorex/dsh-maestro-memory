@@ -54,7 +54,9 @@ export interface ListOpts {
   recent?: boolean
   branch?: string
   archived?: boolean
-  // summary mode not separate; expand is explicit
+  // A single day for the daily track (YYYY-MM-DD); takes precedence over the
+  // since/until cross-file sweep for one specific date.
+  date?: string
 }
 
 function normalizeTarget(t: string): MemoryTarget {
@@ -67,7 +69,13 @@ function genId(): string {
 }
 
 function todayStamp(): string {
-  return new Date().toISOString().slice(0, 10)
+  // Local calendar date (matching TodoStore.todayStamp) so daily memory and
+  // daily todos land on the same "today" — UTC here drifted a day for
+  // timezones east of UTC around midnight.
+  const d = new Date()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${mm}-${dd}`
 }
 
 function timeStamp(): string {
@@ -237,7 +245,17 @@ export class MaestroMemoryStore {
       return this.filterEntries(entries, opts)
     }
 
-    // daily cross-file when since/until present
+    // daily cross-file when since/until present; a single explicit date wins
+    if (t === 'daily' && opts.date !== undefined) {
+      let p: string
+      try {
+        p = this.fileFor('daily', undefined, opts.date)
+      } catch {
+        // invalid date guards the tool's traversal surface; list returns empty
+        return []
+      }
+      return this.filterEntries(readEntriesSync(p), { ...opts, date: undefined })
+    }
     if (t === 'daily' && (opts.since !== undefined || opts.until !== undefined)) {
       const dir = dailyDir(this.root())
       let days: string[] = []
@@ -322,7 +340,7 @@ export class MaestroMemoryStore {
     target: MemoryTarget,
     entry: string,
     cwd?: string,
-    opts: { branches?: string; summary?: string } = {},
+    opts: { branches?: string; summary?: string; date?: string } = {},
   ): { ok: true; duplicate?: boolean; id?: string } | { ok: false; error: string } {
     try {
       this.assertNotBlocked()
@@ -337,17 +355,16 @@ export class MaestroMemoryStore {
       if (opts.branches) content = this.applyBranchTag(content, opts.branches)
       if (opts.summary) {
         content = this.applySummaryTag(content, opts.summary)
-        // Generate id for expand support when summary present (or always for key with summary)
-        content = this.ensureId(content)
-      } else {
-        // Even without summary, ensure id exists for key to support expand tests that may use id param?
-        // We generate id only when summary present to keep legacy file cleanliness, but expand by id needs id.
-        // For M2 tests we expect expand works after add with summary, so id generated there is enough.
-        // No auto id otherwise.
       }
+      content = this.ensureId(content)
     }
     // For daily/project, strip hand-written date prefix? Keep simple: no stamping, store verbatim
-    const file = this.fileFor(t, cwd)
+    let file: string
+    try {
+      file = this.fileFor(t, cwd, opts.date)
+    } catch (e: any) {
+      return { ok: false, error: e?.message ?? String(e) }
+    }
     const res = appendEntryAtomicSync(file, content)
     if (!res.ok) return { ok: false, error: res.error }
     if (res.duplicate) return { ok: true, duplicate: true }

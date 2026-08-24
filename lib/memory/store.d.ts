@@ -13,6 +13,7 @@ export interface ListOpts {
     recent?: boolean;
     branch?: string;
     archived?: boolean;
+    date?: string;
 }
 export declare class MaestroMemoryStore {
     private readonly memoryDir;
@@ -31,6 +32,7 @@ export declare class MaestroMemoryStore {
     add(target: MemoryTarget, entry: string, cwd?: string, opts?: {
         branches?: string;
         summary?: string;
+        date?: string;
     }): {
         ok: true;
         duplicate?: boolean;

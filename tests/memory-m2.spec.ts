@@ -13,6 +13,13 @@ let store: MaestroMemoryStore
 const cwd = '/tmp/demo-project'
 const otherCwd = '/tmp/other-project'
 
+// Local calendar date — the memory store stamps daily entries with the local
+// date (not UTC), so the test must read it the same way.
+function todayStr(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+}
+
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), 'maestro-m2-'))
   store = new MaestroMemoryStore(root)
@@ -29,7 +36,7 @@ describe('M2 daily/project tracks', () => {
     store.add('key', '[2026-08-10] key entry', cwd)
     store.add('memory', '[2026-08-10] global entry')
     store.add('user', '[2026-08-10] user entry')
-    const today = new Date().toISOString().slice(0, 10)
+    const today = todayStr()
     expect(existsSync(dailyPath(root, today))).toBe(true)
     expect(existsSync(projectMemoryPath(root, cwd))).toBe(true)
     expect(existsSync(projectKeyPath(root, cwd))).toBe(true)
@@ -238,6 +245,42 @@ describe('M2 summary/expand', () => {
     expect(store.summaryFor(withSum)).toBe('explicit')
     const without = '[2026-08-10] first line\nsecond line'
     expect(store.summaryFor(without)).toBe('first line')
+  })
+})
+
+describe('M2 daily date param + always-id key', () => {
+  it('daily add honors an explicit date (not only today)', () => {
+    store.add('daily', '[08:00] dated entry', undefined, { date: '2026-08-15' })
+    expect(existsSync(dailyPath(root, '2026-08-15'))).toBe(true)
+    // today's file must NOT contain the dated entry
+    const todayEntries = store.list('daily', undefined, { date: todayStr() })
+    expect(todayEntries).not.toEqual(expect.arrayContaining([expect.stringContaining('dated entry')]))
+    const dated = store.list('daily', undefined, { date: '2026-08-15' })
+    expect(dated).toEqual(expect.arrayContaining([expect.stringContaining('dated entry')]))
+  })
+
+  it('daily list with date filter returns only that day', () => {
+    store.add('daily', '[08:00] entry a', undefined, { date: '2026-08-01' })
+    store.add('daily', '[08:00] entry b', undefined, { date: '2026-08-02' })
+    const onlyFirst = store.list('daily', undefined, { date: '2026-08-01' })
+    expect(onlyFirst.length).toBe(1)
+    expect(onlyFirst[0]).toContain('entry a')
+  })
+
+  it('daily add rejects a non-YYYY-MM-DD date (path-traversal guard)', () => {
+    const res = store.add('daily', '[08:00] bad', undefined, { date: '../../etc/passwd' })
+    expect(res.ok).toBe(false)
+  })
+
+  it('key add always emits an id (even without summary) so expand-by-id works', () => {
+    const res = store.add('key', '[2026-08-10] plain key entry', cwd)
+    expect(res.ok).toBe(true)
+    expect(res).toHaveProperty('id')
+    const entries = store.list('key', cwd)
+    expect(entries[0]).toMatch(/\[id:[0-9a-f]{8}\]/)
+    const exp = store.expand('key', res.id!, cwd)
+    expect(exp.ok).toBe(true)
+    if (exp.ok) expect(exp.entry).toContain('plain key entry')
   })
 })
 
