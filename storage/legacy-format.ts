@@ -9,7 +9,7 @@
  *  - DSH-only marker
  *  - legacy todo-tag grammar (first-line tags + multiline content)
  *
- * Behaviour is byte-compatible with dsh-memory-evolve legacy files
+ * Behaviour is byte-compatible with legacy memory files
  * (lib/store.js + lib/todo.js).
  */
 

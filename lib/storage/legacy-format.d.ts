@@ -9,8 +9,8 @@
  *  - DSH-only marker
  *  - legacy todo-tag grammar (first-line tags + multiline content)
  *
- * Behaviour is byte-compatible with dsh-memory-evolve legacy files
- * (lib/store.js + lib/todo.js).
+ * Behaviour is byte-compatible with legacy memory files
+ * (previous store.js + todo.js).
  */
 /** Entry delimiter, byte-compatible with MEMORY.md / USER.md. */
 export declare const ENTRY_DELIMITER = "\n\u00A7\n";

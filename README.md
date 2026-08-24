@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Durable, user-governed memory and todos for DeepSeek Harness (DSH) — a small single-owner replacement for `dsh-memory-evolve` that preserves your existing `~/.dsh/memories` files in place.
+Durable, user-governed memory and todos for DeepSeek Harness (DSH) that preserves your existing `~/.dsh/memories` files in place.
 
 > **One sentence:** Give the AI in DSH cross-session durable memory and todos — the more you use it, the more it understands you, and switching sessions never loses context.
 
@@ -67,7 +67,7 @@ Run `npm test` after host changes, `npm run verify` after TypeScript changes, `n
 
 **Intentionally not in v1:** COI / external CLI dispatch, advisor, notify / `de_channel_send`, local search, prompt library, model registry, bookmarks / mermaid / canvas, DOM hacks. Propose any as a separate plugin later.
 
-## Migration from dsh-memory-evolve
+## Migration
 
 1. **Preflight** (read-only): inventory, parse, byte report, warnings for malformed JSONL / locks.
 2. **Backup**: byte-preserving copy + manifest (`path, bytes, SHA-256, inventory`) under `~/.dsh/memories/.maestro-memory/backups/<utc-run-id>/`.
@@ -91,3 +91,9 @@ Keep current behavior in `README.md` and `docs/architecture.md`. Do not add plan
 *English is the primary language for code, docs and UI. No Chinese is carried over.*
 
 *Reference: `dsh-maestro-harness/AGENTS.md` and `dsh-maestro-harness/CLAUDE.md` for full workflow, Git, layout and security conventions.*
+
+---
+
+## References
+
+This project was initially forked from [`csyangwen/dsh-memory-evolve`](https://github.com/csyangwen/dsh-memory-evolve) and has been fully rebranded and rebuilt as `@ddtcorex/dsh-maestro-memory` — EN-only, single-owner core with in-place adoption. No further reference to the original fork appears elsewhere in this codebase.

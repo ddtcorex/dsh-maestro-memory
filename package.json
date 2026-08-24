@@ -1,7 +1,7 @@
 {
   "name": "@ddtcorex/dsh-maestro-memory",
   "version": "0.1.0",
-  "description": "Durable layered memory (global / user / project / branch / daily), confirmation-gated writes, todos and skills — Maestro single-owner replacement for dsh-memory-evolve. Preserves ~/.dsh/memories files in place with in-place adoption, SHA-256 verified backup and rollback.",
+  "description": "Durable layered memory (global / user / project / branch / daily), confirmation-gated writes, todos and skills. Preserves ~/.dsh/memories files in place with in-place adoption, SHA-256 verified backup and rollback.",
   "private": true,
   "type": "module",
   "main": "lib/index.js",
