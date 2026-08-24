@@ -688,3 +688,99 @@ export function clearWriteBlock(memoryDir: string | null | undefined = null): vo
     } catch {}
   }
 }
+
+export interface RollbackResult {
+  ok: boolean
+  runId: string
+  manifestPath: string
+  restored: number
+  errors: string[]
+}
+
+/**
+ * Restore files from a backup manifest byte-identical.
+ * Used for M4-PR-A rehearsal: exercise and test rollback against copied schema.
+ * - Restores each existing file from backupFilesDir/<relative> to its original path.
+ * - Removes files that appeared after backup if they were absent at backup time.
+ * - Clears write-block and appends journal entry on success.
+ */
+export async function rollback(
+  memoryDir: string | null | undefined = null,
+  runId?: string,
+): Promise<RollbackResult> {
+  const root = resolveMemoryRoot(memoryDir as any)
+  let targetRunId = runId ?? null
+  if (!targetRunId) {
+    try {
+      const schema = JSON.parse(readFileSync(schemaPath(root), 'utf8'))
+      targetRunId = schema.runId ?? null
+    } catch {}
+    if (!targetRunId) targetRunId = latestRunId(root)
+  }
+  if (!targetRunId) {
+    return { ok: false, runId: '', manifestPath: '', restored: 0, errors: ['no manifest found'] }
+  }
+  const manifestPath = backupManifestPath(root, targetRunId)
+  let manifest: any
+  try {
+    manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+  } catch (e: any) {
+    return { ok: false, runId: targetRunId, manifestPath, restored: 0, errors: [`manifest not found: ${e?.message}`] }
+  }
+  const backupFilesDir: string = manifest.backupFilesDir ?? backupFilesDirPath(root, targetRunId)
+  let restored = 0
+  const errors: string[] = []
+  for (const f of manifest.files) {
+    const dest = f.path as string
+    const src = join(backupFilesDir, f.relative as string)
+    try {
+      if (!f.exists) {
+        // file was absent at backup time; remove if it appeared
+        if (existsSync(dest)) {
+          rmSync(dest, { force: true })
+          restored += 1
+        }
+        continue
+      }
+      // file existed; restore byte-identical from backup
+      if (!existsSync(src)) {
+        errors.push(`backup missing for ${f.relative}`)
+        continue
+      }
+      mkdirSync(dirname(dest), { recursive: true })
+      copyFileSync(src, dest)
+      // verify restored sha matches manifest
+      const restoredRaw = readFileSync(dest)
+      const restoredSha = sha256Hex(restoredRaw)
+      if (restoredSha !== f.sha256) {
+        errors.push(`restore sha mismatch for ${f.relative} (expected ${f.sha256?.slice(0, 8)}, got ${restoredSha.slice(0, 8)})`)
+      } else {
+        restored += 1
+      }
+    } catch (e: any) {
+      errors.push(`restore failed for ${f.relative}: ${e?.message ?? String(e)}`)
+    }
+  }
+
+  // clear write-block if any
+  const blockPath = join(maestroMetaDir(root), 'write-block.json')
+  if (existsSync(blockPath)) {
+    try {
+      rmSync(blockPath, { force: true })
+    } catch {}
+  }
+
+  // journal
+  try {
+    const jPath = journalPath(root)
+    mkdirSync(dirname(jPath), { recursive: true })
+    appendFileSync(
+      jPath,
+      JSON.stringify({ runId: targetRunId, at: new Date().toISOString(), action: 'rollback', ok: errors.length === 0, restored, errors }) +
+        '\n',
+      'utf8',
+    )
+  } catch {}
+
+  return { ok: errors.length === 0, runId: targetRunId, manifestPath, restored, errors }
+}

@@ -57,4 +57,19 @@ export interface VerifyResult {
 export declare function verify(memoryDir?: string | null | undefined, runId?: string): Promise<VerifyResult>;
 export declare function isWriteBlocked(memoryDir?: string | null | undefined): boolean;
 export declare function clearWriteBlock(memoryDir?: string | null | undefined): void;
+export interface RollbackResult {
+    ok: boolean;
+    runId: string;
+    manifestPath: string;
+    restored: number;
+    errors: string[];
+}
+/**
+ * Restore files from a backup manifest byte-identical.
+ * Used for M4-PR-A rehearsal: exercise and test rollback against copied schema.
+ * - Restores each existing file from backupFilesDir/<relative> to its original path.
+ * - Removes files that appeared after backup if they were absent at backup time.
+ * - Clears write-block and appends journal entry on success.
+ */
+export declare function rollback(memoryDir?: string | null | undefined, runId?: string): Promise<RollbackResult>;
 //# sourceMappingURL=service.d.ts.map
