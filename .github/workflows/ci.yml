@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build (host + client)
+        run: pnpm run build
+
+      - name: Typecheck (host + client)
+        run: pnpm run verify
+
+      - name: Unit tests (storage & format)
+        run: pnpm exec vitest run tests/legacy-format.spec.ts tests/storage.spec.ts tests/atomic-store.spec.ts
+
+      - name: Integration tests (memory, todo, queue, rpc)
+        run: pnpm exec vitest run tests/memory-m2.spec.ts tests/todo-m3.spec.ts tests/suggestion-queue.spec.ts tests/rpc-queue.spec.ts tests/smoke.spec.ts
+
+      - name: Migration tests (inspect/dryRun/run/verify)
+        run: pnpm exec vitest run tests/migration.spec.ts
+
+      - name: Migration rehearsal (fixture profile + cutover + rollback)
+        run: pnpm exec vitest run tests/m4-rehearsal.spec.ts
+
+      - name: Client bundle verification
+        run: |
+          test -f lib/index.js || (echo "missing lib/index.js" && exit 1)
+          test -f lib/client.js || (echo "missing lib/client.js" && exit 1)
+          test -f lib/index.d.ts || (echo "missing lib/index.d.ts" && exit 1)
+          echo "client bundle ok:"
+          ls -lh lib/client.js lib/index.js
+          echo "checking bundle header..."
+          head -n 2 lib/client.js | grep -q "ModuleLoader" || (echo "client.js missing ModuleLoader header" && exit 1)
+          echo "bundle header verified"
+
+      - name: Full test suite
+        run: pnpm test
