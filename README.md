@@ -28,7 +28,7 @@ Do not skip ahead to implementation, batch multiple tasks into one commit, or co
 - Never commit to `master` directly; batch related work on a feature branch (`feat/...`, `fix/...`). One TDD task = one commit while executing a plan.
 - Conventional commit subjects, imperative mood.
 - Push the branch and open an MR when the batch is green; rebase instead of merging master into the branch when the base moves.
-- `origin` is `git@kai-github:ddtcorex/dsh-maestro-memory.git` (private, default branch `master`).
+- `origin` is `git@github.com:ddtcorex/dsh-maestro-memory.git` (private, default branch `master`).
 
 ## Layout
 
