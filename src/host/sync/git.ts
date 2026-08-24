@@ -104,14 +104,16 @@ export class RealGitAdapter implements GitAdapter {
     const res = spawnSync('git', ['ls-remote', remoteUrl, `refs/heads/${branch}`], { encoding: 'utf8', timeout: 5000, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } })
     if (res.error) return { ok: false, error: (res.error as any).message ?? String(res.error) }
     if (res.status !== 0) {
-      // if branch not found, not an error — still ok (means no remote yet)
       const stderr = String(res.stderr ?? '')
-      if (stderr.toLowerCase().includes('not found') || stderr.includes('could not read')) {
-        // treat remote unreachable as error
-        return { ok: false, error: stderr.trim() || 'ls-remote failed' }
+      const lower = stderr.toLowerCase()
+      // Only a reachable repo where this exact branch/ref does not exist yet is
+      // acceptable (means "first push"). Everything else — unreachable remote,
+      // not a repo, or an auth/connectivity failure — is a hard error so we
+      // never silently treat an offline remote as "no data".
+      if (lower.includes("couldn't find remote ref") || lower.includes('no such ref') || lower.includes('unknown revision')) {
+        return { ok: true }
       }
-      // branch missing is ok (first push)
-      return { ok: true }
+      return { ok: false, error: stderr.trim() || `ls-remote failed (status ${res.status})` }
     }
     return { ok: true }
   }
@@ -187,8 +189,11 @@ export class RealGitAdapter implements GitAdapter {
         if (r.status !== 0) return resolve({ ok: false, error: r.stderr?.toString() ?? 'remote add failed' })
         // try fetch existing branch
         spawnSync('git', ['fetch', 'origin', branch], { cwd: tmp, encoding: 'utf8', env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } })
-        // checkout branch (orphan if not exists)
-        const checkout = spawnSync('git', ['checkout', '-B', branch], { cwd: tmp, encoding: 'utf8' })
+        // Check out the branch ON TOP of the fetched remote tip (FETCH_HEAD) so a
+        // subsequent commit is a descendant of the remote history and can be
+        // pushed as a fast-forward. On the first push FETCH_HEAD is absent, so
+        // checkout falls through to the orphan branch path below.
+        const checkout = spawnSync('git', ['checkout', '-B', branch, 'FETCH_HEAD'], { cwd: tmp, encoding: 'utf8' })
         if (checkout.status !== 0) {
           // try orphan
           spawnSync('git', ['checkout', '--orphan', branch], { cwd: tmp, encoding: 'utf8' })
@@ -249,7 +254,10 @@ export class RealGitAdapter implements GitAdapter {
         r = spawnSync('git', ['remote', 'add', 'origin', remoteUrl], { cwd: repo, encoding: 'utf8' })
         if (r.status !== 0) return resolve({ ok: false, error: r.stderr?.toString() ?? 'remote add failed' })
         spawnSync('git', ['fetch', 'origin', branch], { cwd: repo, encoding: 'utf8', env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } })
-        const checkout = spawnSync('git', ['checkout', '-B', branch], { cwd: repo, encoding: 'utf8' })
+        // Base the branch on the remote tip (FETCH_HEAD) so we fast-forward
+        // instead of producing an orphan root commit that the second push
+        // rejects as non-fast-forward.
+        const checkout = spawnSync('git', ['checkout', '-B', branch, 'FETCH_HEAD'], { cwd: repo, encoding: 'utf8' })
         if (checkout.status !== 0) {
           spawnSync('git', ['checkout', '--orphan', branch], { cwd: repo, encoding: 'utf8' })
           spawnSync('git', ['rm', '-rf', '.'], { cwd: repo, encoding: 'utf8' })

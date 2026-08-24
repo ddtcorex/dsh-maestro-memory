@@ -1,4 +1,4 @@
-export declare const inject: readonly ["tools", "systemPrompt", "workspaceRegistry", "connection"];
+export declare const inject: readonly ["tools", "systemPrompt", "connection"];
 export interface MaestroMemoryConfig {
     memoryDir?: string | null;
     snapshotOrder?: number;

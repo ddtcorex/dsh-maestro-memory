@@ -54,6 +54,15 @@ describe('SuggestionQueue dedupe', () => {
     expect(queue.read()[0].hits).toBe(2)
     expect(queue.read()[0].reason).toBe('reason B')
   })
+
+  it('does NOT dedupe a distinct fact merely because it contains an existing entry as a substring', () => {
+    enqueueSuggestion(queue, 'key', 'the build requires node 18', 'reason A')
+    // This is a more specific fact: it is not the SAME fact, it must be enqueued separately.
+    const r2 = enqueueSuggestion(queue, 'key', 'the build requires node 18 and node 20 for legacy', 'reason B')
+    expect(r2.queued).toBe(2)
+    expect(queue.read().length).toBe(2)
+    expect(queue.read().map((e) => e.content)).toContain('the build requires node 18 and node 20 for legacy')
+  })
 })
 
 describe('SuggestionQueue edited approval', () => {

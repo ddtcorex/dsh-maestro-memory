@@ -19,6 +19,7 @@ import {
   readEntries,
   appendEntryAtomic,
   writeEntriesAtomic,
+  withLockSync,
 } from '../storage/atomic-store.ts'
 import {
   resolveMemoryRoot,
@@ -373,29 +374,32 @@ export class MaestroMemoryStore {
     if (!oldText) return { ok: false, error: 'empty match' }
     if (!newText) return { ok: false, error: 'empty new content' }
     const file = this.fileFor(t, cwd)
-    // Read current entries
-    const entries = readEntriesSync(file)
-    const matches = entries.filter((e) => e.includes(oldText))
-    if (matches.length === 0) return { ok: false, error: `no match for "${oldText}"` }
-    if (matches.length > 1) return { ok: false, error: `ambiguous match for "${oldText}" (${matches.length} hits)`, matches }
-    // Preserve id if existing entry had one (for key)
-    let replacement = newText
-    const oldEntry = matches[0]
-    const oldId = /^\[id:\s*([0-9a-f]{8})\]\s*/i.exec(oldEntry)?.[1]
-    // If replacement already has summary handling? Not for replace; keep simple
-    if (oldId) {
-      // If replacement doesn't already have id, prepend it
-      if (!/^\[id:\s*[0-9a-f]{8}\]\s*/i.test(replacement)) {
-        replacement = `[id:${oldId.toLowerCase()}] ${replacement}`
+    // Read + modify + write inside the directory lock so a concurrent append by
+    // another process is never clobbered by a stale read (cross-process safety).
+    return withLockSync(dirname(file), () => {
+      // Read current entries
+      const entries = readEntriesSync(file)
+      const matches = entries.filter((e) => e.includes(oldText))
+      if (matches.length === 0) return { ok: false, error: `no match for "${oldText}"` }
+      if (matches.length > 1) return { ok: false, error: `ambiguous match for "${oldText}" (${matches.length} hits)`, matches }
+      // Preserve id if existing entry had one (for key)
+      let replacement = newText
+      const oldEntry = matches[0]
+      const oldId = /^\[id:\s*([0-9a-f]{8})\]\s*/i.exec(oldEntry)?.[1]
+      // If replacement already has summary handling? Not for replace; keep simple
+      if (oldId) {
+        // If replacement doesn't already have id, prepend it
+        if (!/^\[id:\s*[0-9a-f]{8}\]\s*/i.test(replacement)) {
+          replacement = `[id:${oldId.toLowerCase()}] ${replacement}`
+        }
       }
-    }
-    // Also preserve branch/summary? No, replace replaces whole entry with provided newContent (plus id)
-    const idx = entries.indexOf(oldEntry)
-    const next = [...entries]
-    next[idx] = replacement
-    const res = writeEntriesAtomicSync(file, next)
-    if (!res.ok) return { ok: false, error: res.error }
-    return { ok: true }
+      const idx = entries.indexOf(oldEntry)
+      const next = [...entries]
+      next[idx] = replacement
+      const res = writeEntriesAtomicSync(file, next)
+      if (!res.ok) return { ok: false, error: res.error }
+      return { ok: true }
+    })
   }
 
   /** Remove unique entry matching substring */
@@ -413,17 +417,19 @@ export class MaestroMemoryStore {
     const oldText = String(match ?? '').trim()
     if (!oldText) return { ok: false, error: 'empty match' }
     const file = this.fileFor(t, cwd)
-    const entries = readEntriesSync(file)
-    // Use ID-immune exact? But remove is substring unique, not exact. Follow legacy: filter includes.
-    const matches = entries.filter((e) => e.includes(oldText))
-    if (matches.length === 0) return { ok: false, error: `no match for "${oldText}"` }
-    if (matches.length > 1) return { ok: false, error: `ambiguous match for "${oldText}" (${matches.length} hits)`, matches }
-    const idx = entries.indexOf(matches[0])
-    const next = [...entries]
-    next.splice(idx, 1)
-    const res = writeEntriesAtomicSync(file, next)
-    if (!res.ok) return { ok: false, error: res.error }
-    return { ok: true, removed: matches[0] }
+    return withLockSync(dirname(file), () => {
+      const entries = readEntriesSync(file)
+      // Use ID-immune exact? But remove is substring unique, not exact. Follow legacy: filter includes.
+      const matches = entries.filter((e) => e.includes(oldText))
+      if (matches.length === 0) return { ok: false, error: `no match for "${oldText}"` }
+      if (matches.length > 1) return { ok: false, error: `ambiguous match for "${oldText}" (${matches.length} hits)`, matches }
+      const idx = entries.indexOf(matches[0])
+      const next = [...entries]
+      next.splice(idx, 1)
+      const res = writeEntriesAtomicSync(file, next)
+      if (!res.ok) return { ok: false, error: res.error }
+      return { ok: true, removed: matches[0] }
+    })
   }
 
   /** Archive-before-delete: move entry to archive then remove from main */
@@ -444,25 +450,27 @@ export class MaestroMemoryStore {
     const m = String(match ?? '').trim()
     if (!m) return { ok: false, error: 'empty match' }
     const mainFile = this.fileFor(t, cwd)
-    const entries = readEntriesSync(mainFile)
-    const matches = entries.filter((e) => e.includes(m))
-    if (matches.length === 0) return { ok: false, error: `no match for "${m}"` }
-    if (matches.length > 1) return { ok: false, error: `ambiguous match for "${m}" (${matches.length} hits)` }
-    const toArchive = matches[0]
-    // Step 1: append to archive
-    const archiveFile = this.archiveFileFor(t, cwd)
-    const archRes = appendEntryAtomicSync(archiveFile, toArchive)
-    if (!archRes.ok) return { ok: false, error: `archive append failed: ${archRes.error}` }
-    // Step 2: remove from main only after archive succeeds
-    const idx = entries.indexOf(toArchive)
-    const next = [...entries]
-    next.splice(idx, 1)
-    const writeRes = writeEntriesAtomicSync(mainFile, next)
-    if (!writeRes.ok) {
-      // Archive already written, but main delete failed; report partial (archive succeeded)
-      return { ok: false, error: `archive succeeded but remove failed: ${writeRes.error}` }
-    }
-    return { ok: true }
+    return withLockSync(dirname(mainFile), () => {
+      const entries = readEntriesSync(mainFile)
+      const matches = entries.filter((e) => e.includes(m))
+      if (matches.length === 0) return { ok: false, error: `no match for "${m}"` }
+      if (matches.length > 1) return { ok: false, error: `ambiguous match for "${m}" (${matches.length} hits)` }
+      const toArchive = matches[0]
+      // Step 1: append to archive
+      const archiveFile = this.archiveFileFor(t, cwd)
+      const archRes = appendEntryAtomicSync(archiveFile, toArchive)
+      if (!archRes.ok) return { ok: false, error: `archive append failed: ${archRes.error}` }
+      // Step 2: remove from main only after archive succeeds
+      const idx = entries.indexOf(toArchive)
+      const next = [...entries]
+      next.splice(idx, 1)
+      const writeRes = writeEntriesAtomicSync(mainFile, next)
+      if (!writeRes.ok) {
+        // Archive already written, but main delete failed; report partial (archive succeeded)
+        return { ok: false, error: `archive succeeded but remove failed: ${writeRes.error}` }
+      }
+      return { ok: true }
+    })
   }
 
   /** List archive entries (with optional query) */

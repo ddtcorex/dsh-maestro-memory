@@ -394,7 +394,12 @@ export class TodoStore {
     }
 
     const defaultView =
-      options.all !== true && options.past !== true && options.status === undefined && options.quadrant === undefined && options.due === undefined
+      options.all !== true &&
+      options.past !== true &&
+      options.status === undefined &&
+      options.quadrant === undefined &&
+      options.due === undefined &&
+      options.cat === undefined
     let selected = all
     if (defaultView) {
       selected = all.filter((it) => {

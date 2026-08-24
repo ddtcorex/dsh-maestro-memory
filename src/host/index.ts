@@ -13,7 +13,7 @@ import { SyncService } from './sync/service.ts'
 import { RealGitAdapter } from './sync/git.ts'
 import { listSkillsSync, listSkills, resolveDefaultMaestroSkillsDir } from './skills-browser.ts'
 
-export const inject = ['tools', 'systemPrompt', 'workspaceRegistry', 'connection'] as const
+export const inject = ['tools', 'systemPrompt', 'connection'] as const
 
 export interface MaestroMemoryConfig {
   memoryDir?: string | null
@@ -274,6 +274,7 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
   // RPC channel for Review queue — explicit user-click decisions
   ctx.effect(() => {
     const channel = '/dsh-maestro-memory'
+    const rpcDate = (v: any) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined)
     const legacyHandler = async (endpoint: string, payload: any) => {
       switch (endpoint) {
         case 'queue.list': {
@@ -316,7 +317,18 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
                   else if (entry.target === 'user') archiveFile = userArchivePath(root)
                   else if (entry.target === 'key' && entry.cwd) archiveFile = projectKeyArchivePath(root, entry.cwd)
                   else if (entry.target.startsWith('todo-')) archiveFile = todoArchivePath(root)
-                  if (archiveFile) appendEntryAtomicSync(archiveFile, stamped)
+                  // No archivable target (e.g. key without cwd): DO NOT silently drop the suggestion.
+                  if (!archiveFile) {
+                    lines.push(`✗ #${number} [${entry.target}] cannot archive (missing cwd or unsupported target)`)
+                    kept.push(entry)
+                    return
+                  }
+                  const appended = appendEntryAtomicSync(archiveFile, stamped)
+                  if (!appended.ok) {
+                    lines.push(`✗ #${number} [${entry.target}] archive failed: ${appended.error}`)
+                    kept.push(entry)
+                    return
+                  }
                   lines.push(`#${number} [${entry.target}] archived`)
                 } catch (e: any) {
                   lines.push(`✗ #${number} [${entry.target}] ${e?.message ?? String(e)}`)
@@ -338,13 +350,42 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
           return { ok: true, entries }
         }
         case 'memory.mutate': {
-          // future: not needed for PR-B
-          return { ok: false, error: 'not implemented' }
+          const action = payload?.action as string
+          const target = payload?.target as string
+          const cwd = payload?.cwd as string | undefined
+          const content = payload?.content as string | undefined
+          const match = payload?.match as string | undefined
+          const id = payload?.id as string | undefined
+          const opts = payload?.opts ?? {}
+          try {
+            if (action === 'list') {
+              return { ok: true, entries: store.list(target as any, cwd, opts) }
+            }
+            if (action === 'add') {
+              return store.add(target as any, content ?? '', cwd, { branches: payload?.branches, summary: payload?.summary })
+            }
+            if (action === 'replace') {
+              return store.replace(target as any, match ?? '', content ?? '', cwd)
+            }
+            if (action === 'remove') {
+              return store.remove(target as any, match ?? '', cwd)
+            }
+            if (action === 'archive') {
+              return store.archive(target as any, match ?? '', cwd)
+            }
+            if (action === 'expand') {
+              return store.expand(target as any, id ?? '', cwd)
+            }
+            return { ok: false, error: `unknown memory action ${action}` }
+          } catch (e: any) {
+            return { ok: false, error: e?.message ?? String(e) }
+          }
         }
         case 'todo.list': {
           const targets: any[] = payload?.targets ?? (payload?.target ? [payload.target] : [...TODO_TARGETS])
           const cwd = payload?.cwd as string | undefined
           const opts = payload?.opts ?? payload ?? {}
+          const date = rpcDate(opts.date)
           const result = todoStore.listTodos(targets, {
             status: opts.status,
             quadrant: opts.quadrant,
@@ -353,18 +394,19 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
             all: opts.all === true,
             past: opts.past === true,
             expired: opts.expired === true,
-            date: opts.date,
-          }, cwd, opts.date)
-          return { ok: true, ...result, text: todoStore.formatList(result, opts.date) }
+            date,
+          }, cwd, date)
+          return { ok: true, ...result, text: todoStore.formatList(result, date) }
         }
         case 'todo.mutate': {
           const action = payload?.action as string
           const target = payload?.target as any
           const cwd = payload?.cwd as string | undefined
-          const date = payload?.date as string | undefined
+          const date = rpcDate(payload?.date as string | undefined)
           if (action === 'add') {
+            const due = typeof payload?.due === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(payload.due) ? payload.due : undefined
             const quadrant = resolveQuadrant({ quadrant: payload?.quadrant, important: payload?.important, urgent: payload?.urgent })
-            const res = todoStore.addTodo(target ?? (cwd ? 'project' : 'work'), String(payload?.content ?? ''), { quadrant, due: payload?.due, cat: payload?.cat }, cwd)
+            const res = todoStore.addTodo(target ?? (cwd ? 'project' : 'work'), String(payload?.content ?? ''), { quadrant, due, cat: payload?.cat }, cwd)
             return { ...res }
           }
           if (action === 'done') {

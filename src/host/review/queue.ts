@@ -84,11 +84,7 @@ export class SuggestionQueue {
       const entries = this.readUnsafe()
       const normalized = normalizeWhitespace(entry.content)
       const existing = entries.find(
-        (e) =>
-          e.target === entry.target &&
-          (normalizeWhitespace(e.content) === normalized ||
-            normalizeWhitespace(e.content).includes(normalized) ||
-            normalized.includes(normalizeWhitespace(e.content))),
+        (e) => e.target === entry.target && normalizeWhitespace(e.content) === normalized,
       )
       if (existing) {
         existing.hits = (existing.hits ?? 1) + 1
@@ -175,11 +171,7 @@ export function enqueueSuggestion(
   if (!reason?.trim()) return { ok: false, message: 'empty reason', queued: queue.read().length }
   const res = queue.mutate((entries) => {
     const existing = entries.find(
-      (e) =>
-        e.target === target &&
-        (normalizeWhitespace(e.content) === normalized ||
-          normalizeWhitespace(e.content).includes(normalized) ||
-          normalized.includes(normalizeWhitespace(e.content))),
+      (e) => e.target === target && normalizeWhitespace(e.content) === normalized,
     )
     if (existing) {
       existing.hits = (existing.hits ?? 1) + 1
