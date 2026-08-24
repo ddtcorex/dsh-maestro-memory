@@ -58,12 +58,12 @@ import notificationStyles from './notification-styles.css'
 /** Locale namespace owned by this plugin (maestro-memory). */
 const NS = 'maestro-memory'
 
-/** Dictionary key set for the memory-evolve namespace. */
+/** Dictionary key set for the maestro-memory namespace (legacy 'memory-evolve' kept for data-path compatibility). */
 export type MemoryEvolveKey = keyof typeof zh
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
-    'memory-evolve': MemoryEvolveKey
+    'maestro-memory': MemoryEvolveKey
   }
 }
 
@@ -161,7 +161,7 @@ export const zh = {
   'broadcast.tab.rooms': 'Rooms',
   'broadcast.tab.settings': 'Settings',
   'broadcast.settings.wsCoord.title': 'Workspace coordination (ws-coord)',
-  'broadcast.settings.wsCoord.desc': 'Resource-occupancy coordination for parallel sessions in one workspace — declare files you will modify (de_ws_declare), auto-register writes, write-conflict detection (soft warning / hard block switchable), and de_ws_status to see "who is running and what they are doing". These switches only control this sub-feature; the "Session broadcast" master switch lives under Memory Evolve Settings → Config.',
+  'broadcast.settings.wsCoord.desc': 'Resource-occupancy coordination for parallel sessions in one workspace — declare files you will modify (de_ws_declare), auto-register writes, write-conflict detection (soft warning / hard block switchable), and de_ws_status to see "who is running and what they are doing". These switches only control this sub-feature; the "Session broadcast" master switch lives under Maestro Memory Settings → Config.',
   'broadcast.settings.wsCoord.enabled': 'Enable workspace coordination',
   'broadcast.settings.wsCoord.enabled.hint': 'Registers de_ws_declare / de_ws_status / de_ws_release tools + write-conflict detection listeners + the activity snapshot section. Depends on the "Session broadcast" master switch (unavailable while broadcast is off). Off by default',
   'broadcast.settings.wsCoord.snapshot': 'Activity snapshot section',
@@ -190,7 +190,7 @@ export const zh = {
   'broadcast.guide.alias.item1': 'The "My session" row on top: copy session ID / copy alias, then send it to the other side to start chatting;',
   'broadcast.guide.alias.item2': 'The ⧉ copy-session-ID / ✎ alias buttons at the top right of a session also work.',
   'broadcast.guide.switch.title': 'Switch',
-  'broadcast.guide.switch.body': 'Session broadcast is off by default: enable "Session broadcast" under "Config" in the "Memory Evolve Settings" tab, then refresh to reveal this tab.',
+  'broadcast.guide.switch.body': 'Session broadcast is off by default: enable "Session broadcast" under "Config" in the "Maestro Memory Settings" tab, then refresh to reveal this tab.',
   'broadcast.guide.wscoord.title': 'Workspace coordination: parallel work without collisions',
   'broadcast.guide.wscoord.body': 'When several sessions edit the same project in parallel, use the workspace coordination in the "Settings" page to avoid overwriting each other:',
   'broadcast.guide.wscoord.item1': 'Before starting, have the AI "declare which files you will change" (de_ws_declare) — others (and their AIs) can see who is editing what;',
@@ -252,7 +252,7 @@ export const zh = {
   'broadcast.room.presence.unknown': 'unknown · no activity recorded',
   'header.copySessionId': '⧉ Copy session ID',
   'header.copySessionId.done': '✓ Copied',
-  'header.copySessionId.title': 'Copy this session\\'s ID (send it to another session: tell its AI your session ID so it can broadcast to you via de_broadcast)',
+  'header.copySessionId.title': 'Copy this session\'s ID (send it to another session: tell its AI your session ID so it can broadcast to you via de_broadcast)',
   'header.setAlias': '✎ Alias',
   'header.setAlias.title': 'Set a session alias (≤10 chars) — shown as your friendly name in the snapshot / broadcast panel / messages',
   'header.setAlias.placeholder': 'alias (≤10 chars)',
@@ -264,11 +264,12 @@ export const zh = {
   'advisor.header.toggle.title': 'Open or collapse the Advisor review panel',
   'promptTab.label': 'Prompts',
   'promptTab.label.active': '🔴 Prompts ({count})',
-  'settingsTab.label': 'Memory Evolve Settings',
-  'settingsTab.label.pending': '🔴 Memory Evolve Settings',
+  'settingsTab.label': 'Maestro Memory Settings',
+  'settingsTab.label.pending': '🔴 Maestro Memory Settings',
   'settingsTab.feature.guide': 'Guide',
   'settingsTab.feature.config': 'Config',
   'settingsTab.feature.version': 'Version',
+  // —— version check & update (phase 1) ——
   'version.current': 'Current version',
   'version.latest': 'Latest version',
   'version.statusLabel': 'Status',
@@ -287,12 +288,14 @@ export const zh = {
   'version.restart.title': 'Restart required',
   'version.restart.hint': 'New code is on disk. Restart dsh web first, then refresh the browser (a page refresh alone will not load the new code).',
   'version.releaseNotes': 'Release notes',
-  'version.unsupported.hint': 'Auto-check requires a git clone install. Reinstall with `git clone git@github.com:csyangwen/maestro-memory.git` to enable it.',
+  'version.unsupported.hint': 'Auto-check requires a git clone install. Reinstall with `git clone git@github.com:ddtcorex/dsh-maestro-memory.git` to enable it.',
+  // status note codes (server sends codes only; text lives here).
   'version.note.no-release': 'No release tags (v0.x.y) on the remote yet.',
   'version.note.outdated': 'A new version is available — update below (restart dsh web afterwards).',
   'version.note.latest-exact': 'You are on the latest release.',
   'version.note.latest-contained': 'Your checkout already contains the latest release (dev-track ahead or synced).',
   'version.note.unsupported': 'Plugin dir is not a git repository or git is unavailable.',
+  // error codes (P1-5 / P2-4: dictionary-mapped errors).
   'version.error.bad-request': 'Bad request: {message}',
   'version.error.dirty': 'Update rejected: {message}',
   'version.error.busy': 'Update rejected: {message}',
@@ -330,7 +333,7 @@ export const zh = {
   'modelsTab.guide.tool.item1': 'Only "enabled" models are returned by default (all=true shows everything incl. disabled), filterable by provider;',
   'modelsTab.guide.tool.item2': 'Each model reports: enabled, DSH-activated, image input support (supportsImage: true / false / null=unknown), thinking support, allowed reasoning levels (incl. recommended and custom), note.',
   'modelsTab.guide.switch.title': 'Switch',
-  'modelsTab.guide.switch.body': 'Model Settings are on by default; they can be turned off independently under "Config" in the "Memory Evolve Settings" tab like other modules — the tab and the de_models tool hide, settings data is kept.',
+  'modelsTab.guide.switch.body': 'Model Settings are on by default; they can be turned off independently under "Config" in the "Maestro Memory Settings" tab like other modules — the tab and the de_models tool hide, settings data is kept.',
   'modelsTab.searchPh': 'Search provider, model, or note…',
   'modelsTab.showReasoning': 'Show reasoning levels',
   'modelsTab.refresh': 'Refresh',
@@ -367,6 +370,11 @@ export const zh = {
   'modelsTab.save': 'Save',
   'modelsTab.saving': 'Saving…',
   'modelsTab.cancel': 'Cancel',
+  // DSH UI Settings tab (ui-settings-hub): module intro (guide sub-tab) +
+  // future extension seat (themes etc.). The real feature (session filter)
+  // is a global DOM enhancement independent of this tab; the feature
+  // switches (uiSettings.feature.*) are consumed by the "General" sub-tab
+  // and broadcast via event for apply() to sync DOM injection.
   'uiSettingsTab.label': 'Web UI Settings',
   'uiSettingsTab.feature.mixed': 'General',
   'uiSettingsTab.feature.guide': 'Guide',
@@ -375,7 +383,7 @@ export const zh = {
   'uiSettingsTab.guide.what.title': 'What is Web UI Settings',
   'uiSettingsTab.guide.what.body': 'Style-level tweaks for the DSH web GUI — no framework source changes, pure client-side injection (CSS + DOM enhancement) that survives DSH updates; future extensions (themes etc.) all land in this module.',
   'uiSettingsTab.guide.switch.title': 'Switches',
-  'uiSettingsTab.guide.switch.body': 'The module switch lives under "Config" in the "Memory Evolve Settings" tab (off by default); the per-feature switches live in the "General" sub-tab — also all off by default, turned on deliberately.',
+  'uiSettingsTab.guide.switch.body': 'The module switch lives under "Config" in the "Maestro Memory Settings" tab (off by default); the per-feature switches live in the "General" sub-tab — also all off by default, turned on deliberately.',
   'uiSettingsTab.guide.features.title': 'Features',
   'uiSettingsTab.guide.features.body': 'Each feature has an independent switch in the "General" page; it takes effect immediately:',
   'uiSettingsTab.guide.features.item1': 'Session filter: the left session list shows only active sessions; purely idle ones collapse, one click switches back to all;',
@@ -383,6 +391,7 @@ export const zh = {
   'uiSettingsTab.guide.features.item3': 'Wide bubbles: the user message bubble grows from its 525px cap to about 80% width (pairs best with the wide conversation);',
   'uiSettingsTab.guide.features.item4': 'Context warning: the context ring turns yellow above 30% and red above 40% — a nudge to bookmark or start a fresh session;',
   'uiSettingsTab.guide.features.item5': 'Mermaid rendering: mermaid code blocks in messages render into diagrams; on failure they fall back to plain code blocks.',
+  // Feature-switch row labels (rendered by the "General" sub-tab).
   'uiSettings.feature.sessionFilter': 'Session filter',
   'uiSettings.feature.sessionFilter.hint': 'The left session list shows only active sessions (purely idle ones collapse; one click switches back to all); the filter bar appears only while this is on',
   'uiSettings.feature.wideChat': 'Wide conversation area',
@@ -393,10 +402,12 @@ export const zh = {
   'uiSettings.feature.contextWarn.hint': 'The context-usage ring beside the input box turns yellow above 30% occupancy and red above 40%; back to its default color below the threshold',
   'uiSettings.feature.mermaidRender': 'Mermaid diagram rendering',
   'uiSettings.feature.mermaidRender.hint': 'Render mermaid code blocks in messages as diagrams (DSH itself does not render mermaid); the engine loads lazily on first diagram, works on PC and mobile alike, and falls back to the code block on failure',
+  // Filter-bar button labels (consumed by session-filter.ts injected DOM).
   'uiSettings.filter.on': 'Running only',
   'uiSettings.filter.off': 'All',
   'uiSettings.running.label': '{count} running',
   'uiSettings.ungrouped': 'Ungrouped',
+  // Session bookmarks (independent submodule, bookmarkEnabled off by default):
   'syncTab.label': 'Memory Sync',
   'syncTab.loading': 'Loading…',
   'syncTab.loadFailed': 'Failed to load status: {message}',
@@ -435,15 +446,15 @@ export const zh = {
   'syncTab.global.push': 'Push',
   'syncTab.global.notInit': 'Shared memory repo is not enabled — global memory is unavailable; enable and save the URL on the "Shared memory repo" page first',
   'syncTab.remote.desc': 'One shared memory repo for the whole device: project Mode B and global memory (user profile / daily logs / todos) both reference it — enable and save the URL once.',
+  'syncTab.remote.placeholder': 'Paste a shared memory repo URL (e.g. ssh://git@.../dsh-memories.git)',
+  'syncTab.remote.save': 'Enable & save',
+  'syncTab.remote.modify': 'Modify & save',
+  'syncTab.remote.current': 'Current shared memory repo: {url}',
   'syncTab.remote.mode.off': 'Disabled',
   'syncTab.remote.mode.off.desc': 'Project Mode B and global memory unavailable; synced data and the URL are kept',
   'syncTab.remote.mode.on': 'Enabled',
   'syncTab.remote.mode.on.desc': 'Project Mode B and global memory available; save the repo URL first',
   'syncTab.remote.disable': 'Disable shared memory repo',
-  'syncTab.remote.current': 'Current shared memory repo: {url}',
-  'syncTab.remote.placeholder': 'Paste a shared memory repo URL (e.g. ssh://git@.../dsh-memories.git)',
-  'syncTab.remote.save': 'Enable & save',
-  'syncTab.remote.modify': 'Modify & save',
   'syncTab.remote.switchHint': 'Disabling turns off the shared memory repo (project Mode B and global memory become unavailable); synced data and the URL are kept, re-enable anytime.',
   'syncTab.actions.sync': 'Fetch & merge',
   'syncTab.actions.push': 'Push',
@@ -461,7 +472,7 @@ export const zh = {
   'bookmark.tab.list': 'List',
   'bookmark.tab.guide': 'Guide',
   'bookmark.list.title': 'Session bookmarks',
-  'bookmark.list.help': 'Click a bookmark to jump to that turn; star ☆ at each turn tail to bookmark, ★ when bookmarked (rename/delete); searchable list; fork from any turn (official mid-turn branch buttons are taken over by Memory Evolve).',
+  'bookmark.list.help': 'Click a bookmark to jump to that turn; star ☆ at each turn tail to bookmark, ★ when bookmarked (rename/delete); searchable list; fork from any turn (official mid-turn branch buttons are taken over by Maestro Memory).',
   'bookmark.refresh': 'Refresh',
   'bookmark.loading': 'Loading…',
   'bookmark.empty': '(No bookmarks yet — click ☆ at a turn tail)',
@@ -473,16 +484,16 @@ export const zh = {
   'bookmark.noSession': 'Cannot determine the current session (refresh the page and retry)',
   'bookmark.search.placeholder': 'Search bookmarks…',
   'bookmark.search.empty': '(No matching bookmarks)',
-  'bookmark.star.title.off': '☆ Bookmark this turn (Memory Evolve session bookmarks)',
-  'bookmark.star.title.on': '★ Bookmarked: {label} (Memory Evolve — click to rename/delete)',
+  'bookmark.star.title.off': '☆ Bookmark this turn (Maestro Memory session bookmarks)',
+  'bookmark.star.title.on': '★ Bookmarked: {label} (Maestro Memory — click to rename/delete)',
   'bookmark.menu.rename': 'Rename',
   'bookmark.menu.delete': 'Delete',
   'bookmark.action.jump': 'Jump',
   'bookmark.action.fork': 'Fork',
   'bookmark.action.rename': 'Rename',
   'bookmark.action.delete': 'Delete',
-  'bookmark.fork.title': 'Fork from this turn (Memory Evolve enhancement)',
-  'bookmark.fork.confirm': 'Officially you can only fork from the last message. Fork from this turn (seq {n}) anyway? (Memory Evolve enhancement)',
+  'bookmark.fork.title': 'Fork from this turn (Maestro Memory enhancement)',
+  'bookmark.fork.confirm': 'Officially you can only fork from the last message. Fork from this turn (seq {n}) anyway? (Maestro Memory enhancement)',
   'bookmark.fork.working': 'Creating fork session…',
   'bookmark.fork.ok': 'New session created: {id} (see the session list on the left)',
   'bookmark.jump.hint': 'Click to jump to this turn',
@@ -500,18 +511,20 @@ export const zh = {
   'bookmark.guide.list.title': 'List and jump',
   'bookmark.guide.list.body': 'This tab lists every bookmark of the current session (label, turn, time, summary). Click to jump: it switches back to the Chat tab and scrolls to that turn; if the target lies outside the loaded history window it fetches older messages first.',
   'bookmark.guide.switch.title': 'Switch',
-  'bookmark.guide.switch.body': 'Off by default; enable "Session bookmarks" under Memory Evolve Settings → Config. When off, stars and this tab hide; the sidecar file is kept.',
+  'bookmark.guide.switch.body': 'Off by default; enable "Session bookmarks" under Maestro Memory Settings → Config. When off, stars and this tab hide; the sidecar file is kept.',
   'panel.guide.bookmark.title': 'Session bookmarks',
   'panel.guide.bookmark.desc': 'Star any turn and jump back from the list; fork official branch sessions from any turn (including taking over official mid-turn branch buttons). Independent switch, off by default.',
   'panel.config.bookmarkEnabled': 'Session bookmarks',
   'panel.config.bookmarkEnabled.hint': 'Enable session bookmarks: a ☆ star on each completed turn tail + a Bookmarks tab for the list and jump; fork official branch sessions from any turn (list "Fork" button, or click the official branch button — mid-turn buttons are taken over with a confirm dialog). Data lives in <memoryDir>/session-bookmarks.json (per-session, keyed by turn seq). **Independent submodule** (off by default; pure UI + host API, no AI tools); when off, stars and the tab hide, the data file is kept.',
   'panel.config.todoEnabled': 'Todos',
   'panel.config.todoEnabled.hint': 'Enable the dtodo tool, Todos tab, and due reminders. When off, the tab hides immediately and todo writes stop; existing data and the sync track stay intact.',
+  // Legacy keys kept for compatibility (old merged memory-tab layout).
   'memoryTab.feature.config': 'Config',
   'memoryTab.feature.todoSuggestions': 'Todo suggestions',
   'memoryTab.feature.skills': 'Skill suggestions',
   'memoryTab.feature.skillBrowser': 'Skill manager',
   'memoryTab.feature.todo': 'Todos',
+  // Memory-tab guide (the "Guide" sub-tab: detailed intro of the memory feature itself).
   'memoryTab.guide.tracks.title': 'Five memory tracks: the AI long-term working memory',
   'memoryTab.guide.tracks.body': 'Memory is organized in five tiers by "who should see it"; injection scope narrows by tier and tiers never pollute each other — what should be injected is auto-injected, the rest is read on demand:',
   'memoryTab.guide.tracks.item1': 'User profile (user): who you are — preferences, habits, communication style. Injected into every session, so you never re-introduce yourself;',
@@ -539,6 +552,7 @@ export const zh = {
   'memoryTab.guide.suggestions.item2': 'Archive: no injection, kept for reference, restorable; Reject: discard.',
   'memoryTab.guide.confirm.title': 'The confirmation system: why your approval is required',
   'memoryTab.guide.confirm.body': 'Memory writes genuinely change the AI behavior — once written they enter the context and affect every later reply. So everything goes through your confirmation first: that is the gate of memory evolution. You are in charge.',
+  // Skills-tab guide (the "Guide" sub-tab: detailed intro of the skill feature itself).
   'skillsTab.guide.what.title': 'What a skill is: a methodology manual for the AI',
   'skillsTab.guide.what.body': 'A skill = a methodology document for the AI (SKILL.md: name + description + steps). It is injected into every session system prompt — next time the AI meets the same kind of task it follows your process instead of re-inventing it:',
   'skillsTab.guide.what.item1': 'The skill library lives at ~/.agents/skills by default (one directory per skill);',
@@ -568,6 +582,7 @@ export const zh = {
   'skillsTab.guide.restraint.body': 'Skills are injected into every session system prompt and affect context and cache — create sparingly:',
   'skillsTab.guide.restraint.item1': 'Only create skills for "hard, recurring problems you will meet again";',
   'skillsTab.guide.restraint.item2': 'Never create a skill for a one-off or trivial task.',
+  // Todos-tab guide (the "Guide" sub-tab: detailed intro of the todo feature itself).
   'todosTab.guide.tracks.title': 'Four todo tracks: everything in its place',
   'todosTab.guide.tracks.body': 'Todos are filed by target, isomorphic to the memory system:',
   'todosTab.guide.tracks.item1': 'Life (life): personal errands;',
@@ -601,7 +616,7 @@ export const zh = {
   'todo.track.daily': 'Today',
   'todo.track.past': 'Past',
   'todo.projectHint': 'No working directory for this session — project todos unavailable (life/work/today only).',
-  'todo.help': 'Four tracks: Life=personal errands; Work=cross-project tasks; This project=the current working directory\\'s todos (invisible from other dirs); Today=today\\'s tasks (one file per day). Past daily todos (earlier days) are not loaded by default — open the “Past” tab or tick “Show expired” to query history (expired leftovers stay hidden until then). To add: type content, optionally pick a quadrant (important × urgent) and a due date, then hit Add — or just tell me “add a todo, it\\'s for work/life/this project/today” and I will file it in the right track.',
+  'todo.help': 'Four tracks: Life=personal errands; Work=cross-project tasks; This project=the current working directory\'s todos (invisible from other dirs); Today=today\'s tasks (one file per day). Past daily todos (earlier days) are not loaded by default — open the “Past” tab or tick “Show expired” to query history (expired leftovers stay hidden until then). To add: type content, optionally pick a quadrant (important × urgent) and a due date, then hit Add — or just tell me “add a todo, it\'s for work/life/this project/today” and I will file it in the right track.',
   'todo.showExpired': 'Show expired',
   'todo.pastHint': 'Past daily todos are mostly expired leftovers and are hidden by default; tick “Show expired” to view them.',
   'todo.addPlaceholder': 'Type a todo (multi-line ok), pick quadrant/due, add…',
@@ -633,6 +648,7 @@ export const zh = {
   'todo.quadrant.q3': 'Urgent, not important',
   'todo.quadrant.q4': 'Neither',
   'todo.empty': '(No todos yet — add one)',
+  // List / Eisenhower board view switch
   'todo.view.mode': 'View',
   'todo.view.list': 'List',
   'todo.view.board': 'Board',
@@ -668,7 +684,7 @@ export const zh = {
   'memoryTab.cancel': 'Cancel',
   'memoryTab.updated': 'Entry updated',
   'memoryTab.editHint': 'Content only: timestamps and branch tags are program-maintained and cannot be changed; the § delimiter cannot be typed.',
-  'memoryTab.editConfirm': 'This entry is injected into the session context (the model\\'s prompt) right after saving. Save anyway?\n\n{snippet}',
+  'memoryTab.editConfirm': 'This entry is injected into the session context (the model\'s prompt) right after saving. Save anyway?\n\n{snippet}',
   'memoryTab.archive': 'Archive',
   'memoryTab.archiveConfirm': 'Archive this entry? It leaves the main memory (no longer injected) and can be promoted back any time.\n\n{snippet}',
   'memoryTab.archived': 'Archived (no longer injected; can be promoted back)',
@@ -694,7 +710,7 @@ export const zh = {
   'memoryTab.dshOnlyToggleHint': 'Toggle the DSH-only mark: the entry reaches DSH sessions only, external executors (COI) skip it',
   'memoryTab.dshOnlyAdd': 'DSH-only (do not inject into external executors)',
   'memoryTab.desc.project': 'Project log: auto-recorded per turn; never injected, read on demand by the model.',
-  'memoryTab.desc.key': 'Key project facts: conventions/decisions/pitfalls, injected into this project\\'s sessions; written when important, addable/deletable manually.',
+  'memoryTab.desc.key': 'Key project facts: conventions/decisions/pitfalls, injected into this project\'s sessions; written when important, addable/deletable manually.',
   'memoryTab.desc.daily': 'Daily log: per-day progress records with program-tagged project labels; never injected, read on demand.',
   'memoryTab.desc.user': 'User profile: preferences and habits, injected into every session; writes need review + confirmation.',
   'memoryTab.desc.memory': 'Long-term memory: global environment/project facts, injected into every session; writes need review + confirmation.',
@@ -788,7 +804,7 @@ export const zh = {
   'panel.config.perTurnProjectWrites': 'Per-turn project writes',
   'panel.config.perTurnProjectWrites.hint': 'Require the model to check at the end of every turn and record project-related facts (decisions/progress/pitfalls); when off, project memory is read on demand only. ⚠️ Relies on LLM instruction following — weaker models may not comply',
   'panel.config.perTurnDailyWrites': 'Per-turn daily writes',
-  'panel.config.perTurnDailyWrites.hint': 'Require the model to check at the end of every turn and record the day\\'s progress; when off, the daily log is read on demand only. ⚠️ Relies on LLM instruction following — weaker models may not comply',
+  'panel.config.perTurnDailyWrites.hint': 'Require the model to check at the end of every turn and record the day\'s progress; when off, the daily log is read on demand only. ⚠️ Relies on LLM instruction following — weaker models may not comply',
   'panel.config.perTurnKeyWrites': 'Per-turn key-fact check',
   'panel.config.perTurnKeyWrites.hint': 'Require the model to judge at the end of every turn whether an important project fact emerged (long-lived convention/decision/architecture/pitfall); if so, write it to target=key (injected into the context), otherwise skip. When off, key facts are only added manually or read. ⚠️ Relies on LLM instruction following',
   'panel.config.keyProgressiveDisclosure': 'Key-track progressive disclosure',
@@ -801,7 +817,7 @@ export const zh = {
   'panel.config.keyFullInjectCharLimit': 'Full-injection character limit',
   'panel.config.keyFullInjectCharLimit.hint': 'In auto mode, full injection when total characters ≤ this value (default 1500)',
   'panel.config.coiEnabled': 'COI dispatch',
-  'panel.config.coiEnabled.hint': 'Enable the de_coi_* tools and the CLI Dispatch tab: unified dispatch of CLI agents (kimi/codex/grok/hermes…). Off by default — this plugin\\'s core is memory/todos/skills, dispatch is an on-demand add-on; when off, the tools and the tab are completely invisible',
+  'panel.config.coiEnabled.hint': 'Enable the de_coi_* tools and the CLI Dispatch tab: unified dispatch of CLI agents (kimi/codex/grok/hermes…). Off by default — this plugin\'s core is memory/todos/skills, dispatch is an on-demand add-on; when off, the tools and the tab are completely invisible',
   'panel.config.searchDocsEnabled': 'Local file search tool',
   'panel.config.searchDocsEnabled.hint': 'Lets the model search files across all local disks/directories. **Four modes**: all = name + content search; filename only = content/contentQuery parameters are ignored (never reads file contents — for people who use their own content-search implementation); content only = every call does content matching (query acts as the content keyword); off = the tool is completely invisible to the model. Content search: contentQuery="keyword" answers "which document mentions XX" (rg full-text match, returns hit snippets). Off by default',
   'panel.config.searchDocsMode.all': 'All (name + content)',
@@ -809,7 +825,7 @@ export const zh = {
   'panel.config.searchDocsMode.content': 'Content only',
   'panel.config.searchDocsMode.off': 'Off (tool invisible)',
   'panel.config.advisorEnabled': 'Session review (Advisor)',
-  'panel.config.advisorEnabled.hint': 'Master switch for the session-review module. With the switch on, every session still starts OFF — enable reviewing per session from the panel\\'s session switch (reviews consume extra model calls, turn them on only where needed; enabled sessions keep their choice across refreshes/restarts). With the switch off, reviewing stops and all review UI (header toggle / floating panel) is hidden; turn it back on to restore the module instantly',
+  'panel.config.advisorEnabled.hint': 'Master switch for the session-review module. With the switch on, every session still starts OFF — enable reviewing per session from the panel\'s session switch (reviews consume extra model calls, turn them on only where needed; enabled sessions keep their choice across refreshes/restarts). With the switch off, reviewing stops and all review UI (header toggle / floating panel) is hidden; turn it back on to restore the module instantly',
   'panel.config.broadcastEnabled': 'Session broadcast',
   'panel.config.broadcastEnabled.hint': 'Enable session broadcast (de_broadcast): inter-session messaging — the "Session broadcast" unread hint in the snapshot (inbox-style rows: id+subject+sender+time) + the de_broadcast tool (send/list/read; read consumes and auto-deletes once all recipients read; >8KB spills to a file; 30-day cleanup) + the broadcast management panel tab. **Independent of COI dispatch** (off by default, can be enabled alone); when off, all of the above are invisible; the persistent "Your session ID" snapshot section is unaffected; the header "⧉ Copy session ID" / "✎ alias" buttons belong to "Session orchestration" (the panel top also has a copy entry)',
   'panel.config.notifyEnabled': 'Notifications',
@@ -830,13 +846,13 @@ export const zh = {
   'panel.config.sessionSearchEnabled': 'Session search',
   'panel.config.sessionSearchEnabled.hint': 'Enable de_session_search: lets the model search historical sessions of other local AI tools (Codex for now: plain JSONL under ~/.codex/sessions and archived_sessions — rg prefilter keeps it millisecond-fast; DSH sessions not supported yet). Case-insensitive literal matching over user/assistant messages only; supports cwd project filter, relevance/newest/oldest sorting, and limit/window result control. **Independent submodule** (off by default, can be enabled alone — unrelated to COI dispatch/broadcast); zero resident state: no index, no cache, every call scans read-only in real time and never modifies session files; when off the tool is completely invisible to the model',
   'panel.config.canvasEnabled': 'Infinite canvas',
-  'panel.config.canvasEnabled.hint': '**Module switch**: enables the Infinite Canvas — a Canvas tab in conversations + the de_canvas tool (the model can list the board, read nodes by id, and drop notes into the board\\'s center zone). Local path references, single-board with perspective filters (session/project/global + ownership badges), pull-based AI access (board content is never injected into context; query it on demand). **Independent submodule** (off by default): stored at <memoryDir>/canvas/boards.json (whole-board atomic writes + rev optimistic lock to prevent cross-session overwrites); when off the tab and tool are completely invisible, data files are kept',
+  'panel.config.canvasEnabled.hint': '**Module switch**: enables the Infinite Canvas — a Canvas tab in conversations + the de_canvas tool (the model can list the board, read nodes by id, and drop notes into the board\'s center zone). Local path references, single-board with perspective filters (session/project/global + ownership badges), pull-based AI access (board content is never injected into context; query it on demand). **Independent submodule** (off by default): stored at <memoryDir>/canvas/boards.json (whole-board atomic writes + rev optimistic lock to prevent cross-session overwrites); when off the tab and tool are completely invisible, data files are kept',
   'panel.config.sessionEnabled': 'Session orchestration',
   'panel.config.sessionEnabled.hint': 'Enable session orchestration (de_session): lets AI **programmatically create/wake DSH sessions** — spawn creates a standard session (identical to one opened manually: system prompt/tools/memory snapshot/persistence, appears in the left session list and can be taken over), prompt = the full instruction text (role/task freely composed), it starts running immediately; optional cwd / join a broadcast room / model override; wake wakes an existing session (equivalent to sending a message on its behalf — its AI wakes up and processes it, auto-resumed after process restart); status/list inspect state; the header **"⧉ Copy session ID" / "✎ alias" buttons follow this switch** (session-identity features, previously mis-housed under broadcast). **Independent submodule** (off by default; depends on the DSH agents service, only same-process sessions can be woken; when off the tool is invisible to the model)',
   'panel.config.promptsEnabled': 'Prompt manager',
   'panel.config.promptsEnabled.hint': 'Enable the Prompts tab: a prompt library (user-written paradigms + built-in examples) plus an injection track (once / N consecutive turns / every M turns — count and cadence accept any integers; injected content is visible to the model next turn, expires automatically by turn counting, and can be stopped anytime; quick inject works without saving a prompt first, auto-saved to the Temp category). Off by default; when off the snapshot section, event listener and API are fully uninstalled and the tab hides after refresh',
   'panel.config.modelsEnabled': 'Model Settings',
-  'panel.config.modelsEnabled.hint': 'Enable the "Model Settings" tab + de_models tool: a table of DSH providers/models with per-model settings (enabled, note, thinking support, allowed/recommended reasoning levels, custom levels); de_models lets the AI query the available model list. **Off by default** (registering takes a slot in the model tool list; turn it on when needed). ⚠️ These settings **only affect this plugin and never modify or affect DSH\\'s own model settings** (DSH side stays as the official "Settings → Models" says). When off the tab and tool hide and the API refuses access, settings data is kept',
+  'panel.config.modelsEnabled.hint': 'Enable the "Model Settings" tab + de_models tool: a table of DSH providers/models with per-model settings (enabled, note, thinking support, allowed/recommended reasoning levels, custom levels); de_models lets the AI query the available model list. **Off by default** (registering takes a slot in the model tool list; turn it on when needed). ⚠️ These settings **only affect this plugin and never modify or affect DSH\'s own model settings** (DSH side stays as the official "Settings → Models" says). When off the tab and tool hide and the API refuses access, settings data is kept',
   'panel.config.uiSettingsEnabled': 'Web UI Settings',
   'panel.config.uiSettingsEnabled.hint': 'Enable the "Web UI Settings" module: a filter bar appears above the left session list, showing only active sessions by default (generating / awaiting approval / awaiting answer / subagents running / error / finished-but-unviewed — purely idle ones collapse away), one click switches back to all; pure client-side styling (CSS + DOM injection, no DSH framework changes); the filter preference is remembered in the browser. **Off by default**; when off, the filter bar and injected styles are fully removed',
   'panel.config.save': 'Save config',
@@ -951,7 +967,7 @@ export const en: Record<MemoryEvolveKey, string> = {
   'broadcast.tab.rooms': 'Rooms',
   'broadcast.tab.settings': 'Settings',
   'broadcast.settings.wsCoord.title': 'Workspace coordination (ws-coord)',
-  'broadcast.settings.wsCoord.desc': 'Resource-occupancy coordination for parallel sessions in one workspace — declare files you will modify (de_ws_declare), auto-register writes, write-conflict detection (soft warning / hard block switchable), and de_ws_status to see "who is running and what they are doing". These switches only control this sub-feature; the "Session broadcast" master switch lives under Memory Evolve Settings → Config.',
+  'broadcast.settings.wsCoord.desc': 'Resource-occupancy coordination for parallel sessions in one workspace — declare files you will modify (de_ws_declare), auto-register writes, write-conflict detection (soft warning / hard block switchable), and de_ws_status to see "who is running and what they are doing". These switches only control this sub-feature; the "Session broadcast" master switch lives under Maestro Memory Settings → Config.',
   'broadcast.settings.wsCoord.enabled': 'Enable workspace coordination',
   'broadcast.settings.wsCoord.enabled.hint': 'Registers de_ws_declare / de_ws_status / de_ws_release tools + write-conflict detection listeners + the activity snapshot section. Depends on the "Session broadcast" master switch (unavailable while broadcast is off). Off by default',
   'broadcast.settings.wsCoord.snapshot': 'Activity snapshot section',
@@ -980,7 +996,7 @@ export const en: Record<MemoryEvolveKey, string> = {
   'broadcast.guide.alias.item1': 'The "My session" row on top: copy session ID / copy alias, then send it to the other side to start chatting;',
   'broadcast.guide.alias.item2': 'The ⧉ copy-session-ID / ✎ alias buttons at the top right of a session also work.',
   'broadcast.guide.switch.title': 'Switch',
-  'broadcast.guide.switch.body': 'Session broadcast is off by default: enable "Session broadcast" under "Config" in the "Memory Evolve Settings" tab, then refresh to reveal this tab.',
+  'broadcast.guide.switch.body': 'Session broadcast is off by default: enable "Session broadcast" under "Config" in the "Maestro Memory Settings" tab, then refresh to reveal this tab.',
   'broadcast.guide.wscoord.title': 'Workspace coordination: parallel work without collisions',
   'broadcast.guide.wscoord.body': 'When several sessions edit the same project in parallel, use the workspace coordination in the "Settings" page to avoid overwriting each other:',
   'broadcast.guide.wscoord.item1': 'Before starting, have the AI "declare which files you will change" (de_ws_declare) — others (and their AIs) can see who is editing what;',
@@ -1054,8 +1070,8 @@ export const en: Record<MemoryEvolveKey, string> = {
   'advisor.header.toggle.title': 'Open or collapse the Advisor review panel',
   'promptTab.label': 'Prompts',
   'promptTab.label.active': '🔴 Prompts ({count})',
-  'settingsTab.label': 'Memory Evolve Settings',
-  'settingsTab.label.pending': '🔴 Memory Evolve Settings',
+  'settingsTab.label': 'Maestro Memory Settings',
+  'settingsTab.label.pending': '🔴 Maestro Memory Settings',
   'settingsTab.feature.guide': 'Guide',
   'settingsTab.feature.config': 'Config',
   'settingsTab.feature.version': 'Version',
@@ -1078,7 +1094,7 @@ export const en: Record<MemoryEvolveKey, string> = {
   'version.restart.title': 'Restart required',
   'version.restart.hint': 'New code is on disk. Restart dsh web first, then refresh the browser (a page refresh alone will not load the new code).',
   'version.releaseNotes': 'Release notes',
-  'version.unsupported.hint': 'Auto-check requires a git clone install. Reinstall with `git clone git@github.com:csyangwen/maestro-memory.git` to enable it.',
+  'version.unsupported.hint': 'Auto-check requires a git clone install. Reinstall with `git clone git@github.com:ddtcorex/dsh-maestro-memory.git` to enable it.',
   // status note codes (server sends codes only; text lives here).
   'version.note.no-release': 'No release tags (v0.x.y) on the remote yet.',
   'version.note.outdated': 'A new version is available — update below (restart dsh web afterwards).',
@@ -1123,7 +1139,7 @@ export const en: Record<MemoryEvolveKey, string> = {
   'modelsTab.guide.tool.item1': 'Only "enabled" models are returned by default (all=true shows everything incl. disabled), filterable by provider;',
   'modelsTab.guide.tool.item2': 'Each model reports: enabled, DSH-activated, image input support (supportsImage: true / false / null=unknown), thinking support, allowed reasoning levels (incl. recommended and custom), note.',
   'modelsTab.guide.switch.title': 'Switch',
-  'modelsTab.guide.switch.body': 'Model Settings are on by default; they can be turned off independently under "Config" in the "Memory Evolve Settings" tab like other modules — the tab and the de_models tool hide, settings data is kept.',
+  'modelsTab.guide.switch.body': 'Model Settings are on by default; they can be turned off independently under "Config" in the "Maestro Memory Settings" tab like other modules — the tab and the de_models tool hide, settings data is kept.',
   'modelsTab.searchPh': 'Search provider, model, or note…',
   'modelsTab.showReasoning': 'Show reasoning levels',
   'modelsTab.refresh': 'Refresh',
@@ -1173,7 +1189,7 @@ export const en: Record<MemoryEvolveKey, string> = {
   'uiSettingsTab.guide.what.title': 'What is Web UI Settings',
   'uiSettingsTab.guide.what.body': 'Style-level tweaks for the DSH web GUI — no framework source changes, pure client-side injection (CSS + DOM enhancement) that survives DSH updates; future extensions (themes etc.) all land in this module.',
   'uiSettingsTab.guide.switch.title': 'Switches',
-  'uiSettingsTab.guide.switch.body': 'The module switch lives under "Config" in the "Memory Evolve Settings" tab (off by default); the per-feature switches live in the "General" sub-tab — also all off by default, turned on deliberately.',
+  'uiSettingsTab.guide.switch.body': 'The module switch lives under "Config" in the "Maestro Memory Settings" tab (off by default); the per-feature switches live in the "General" sub-tab — also all off by default, turned on deliberately.',
   'uiSettingsTab.guide.features.title': 'Features',
   'uiSettingsTab.guide.features.body': 'Each feature has an independent switch in the "General" page; it takes effect immediately:',
   'uiSettingsTab.guide.features.item1': 'Session filter: the left session list shows only active sessions; purely idle ones collapse, one click switches back to all;',
@@ -1262,7 +1278,7 @@ export const en: Record<MemoryEvolveKey, string> = {
   'bookmark.tab.list': 'List',
   'bookmark.tab.guide': 'Guide',
   'bookmark.list.title': 'Session bookmarks',
-  'bookmark.list.help': 'Click a bookmark to jump to that turn; star ☆ at each turn tail to bookmark, ★ when bookmarked (rename/delete); searchable list; fork from any turn (official mid-turn branch buttons are taken over by Memory Evolve).',
+  'bookmark.list.help': 'Click a bookmark to jump to that turn; star ☆ at each turn tail to bookmark, ★ when bookmarked (rename/delete); searchable list; fork from any turn (official mid-turn branch buttons are taken over by Maestro Memory).',
   'bookmark.refresh': 'Refresh',
   'bookmark.loading': 'Loading…',
   'bookmark.empty': '(No bookmarks yet — click ☆ at a turn tail)',
@@ -1274,16 +1290,16 @@ export const en: Record<MemoryEvolveKey, string> = {
   'bookmark.noSession': 'Cannot determine the current session (refresh the page and retry)',
   'bookmark.search.placeholder': 'Search bookmarks…',
   'bookmark.search.empty': '(No matching bookmarks)',
-  'bookmark.star.title.off': '☆ Bookmark this turn (Memory Evolve session bookmarks)',
-  'bookmark.star.title.on': '★ Bookmarked: {label} (Memory Evolve — click to rename/delete)',
+  'bookmark.star.title.off': '☆ Bookmark this turn (Maestro Memory session bookmarks)',
+  'bookmark.star.title.on': '★ Bookmarked: {label} (Maestro Memory — click to rename/delete)',
   'bookmark.menu.rename': 'Rename',
   'bookmark.menu.delete': 'Delete',
   'bookmark.action.jump': 'Jump',
   'bookmark.action.fork': 'Fork',
   'bookmark.action.rename': 'Rename',
   'bookmark.action.delete': 'Delete',
-  'bookmark.fork.title': 'Fork from this turn (Memory Evolve enhancement)',
-  'bookmark.fork.confirm': 'Officially you can only fork from the last message. Fork from this turn (seq {n}) anyway? (Memory Evolve enhancement)',
+  'bookmark.fork.title': 'Fork from this turn (Maestro Memory enhancement)',
+  'bookmark.fork.confirm': 'Officially you can only fork from the last message. Fork from this turn (seq {n}) anyway? (Maestro Memory enhancement)',
   'bookmark.fork.working': 'Creating fork session…',
   'bookmark.fork.ok': 'New session created: {id} (see the session list on the left)',
   'bookmark.jump.hint': 'Click to jump to this turn',
@@ -1301,7 +1317,7 @@ export const en: Record<MemoryEvolveKey, string> = {
   'bookmark.guide.list.title': 'List and jump',
   'bookmark.guide.list.body': 'This tab lists every bookmark of the current session (label, turn, time, summary). Click to jump: it switches back to the Chat tab and scrolls to that turn; if the target lies outside the loaded history window it fetches older messages first.',
   'bookmark.guide.switch.title': 'Switch',
-  'bookmark.guide.switch.body': 'Off by default; enable "Session bookmarks" under Memory Evolve Settings → Config. When off, stars and this tab hide; the sidecar file is kept.',
+  'bookmark.guide.switch.body': 'Off by default; enable "Session bookmarks" under Maestro Memory Settings → Config. When off, stars and this tab hide; the sidecar file is kept.',
   'panel.guide.bookmark.title': 'Session bookmarks',
   'panel.guide.bookmark.desc': 'Star any turn and jump back from the list; fork official branch sessions from any turn (including taking over official mid-turn branch buttons). Independent switch, off by default.',
   'panel.config.bookmarkEnabled': 'Session bookmarks',
@@ -1690,7 +1706,7 @@ const BADGE_POLL_MS = 30_000
  * ## Why on the export surface instead of injecting in apply()
  * The protocol lets dsh-android-edapp centrally discover and inject (including lifecycle /
  * ordering with the generic fallback layer); the plugin no longer injects mobile styles into <head> itself.
- * 2026-08-09 decision: the 9+1 Tab mobile adaptations for memory-evolve (~330 lines,
+ * 2026-08-09 decision: the 9+1 Tab mobile adaptations for maestro-memory (legacy memory-evolve, ~330 lines,
  * previously in dsh-android-edapp/src/client/mobile-tabs.css) were moved back into this plugin;
  * adaptation travels with the plugin — upgrades touch only this repo; dsh-android-edapp keeps only the shell + generic fallback
  * + adaptation manager.
@@ -1721,18 +1737,18 @@ export const inject = ['slots', 'locale', 'conversation', 'sessions']
 export function apply(ctx: Context): void {
   const t = ctx.locale.bind(NS) as unknown as Translate
 
-  ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'memory-evolve: dictionaries')
+  ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'maestro-memory: dictionaries')
 
   ctx.effect(() => {
     if (typeof document === 'undefined') return () => {}
-    const existing = document.querySelector('style[data-memory-evolve-css]')
+    const existing = document.querySelector('style[data-maestro-memory-css]')
     if (existing !== null) return () => {}
     const tag = document.createElement('style')
     tag.dataset.memoryEvolveCss = '1'
     tag.textContent = styles
     document.head.appendChild(tag)
     return () => { tag.remove() }
-  }, 'memory-evolve: stylesheet')
+  }, 'maestro-memory: stylesheet')
 
   // Skill-browser styles (merged from the standalone dsh-skill-browser
   // plugin): sb- prefixed, injected alongside the panel styles.
@@ -1745,7 +1761,7 @@ export function apply(ctx: Context): void {
     tag.textContent = skillBrowserStyles
     document.head.appendChild(tag)
     return () => { tag.remove() }
-  }, 'memory-evolve: skill browser stylesheet')
+  }, 'maestro-memory: skill browser stylesheet')
 
   // COI dispatch styles (coi- prefix, injected independently).
   ctx.effect(() => {
@@ -1757,7 +1773,7 @@ export function apply(ctx: Context): void {
     tag.textContent = coiStyles
     document.head.appendChild(tag)
     return () => { tag.remove() }
-  }, 'memory-evolve: coi stylesheet')
+  }, 'maestro-memory: coi stylesheet')
 
   // Session broadcast styles (bb- prefix, injected independently).
   ctx.effect(() => {
@@ -1769,7 +1785,7 @@ export function apply(ctx: Context): void {
     tag.textContent = broadcastStyles
     document.head.appendChild(tag)
     return () => { tag.remove() }
-  }, 'memory-evolve: broadcast stylesheet')
+  }, 'maestro-memory: broadcast stylesheet')
 
   // Prompt styles (pm- prefix, injected independently).
   ctx.effect(() => {
@@ -1781,7 +1797,7 @@ export function apply(ctx: Context): void {
     tag.textContent = promptStyles
     document.head.appendChild(tag)
     return () => { tag.remove() }
-  }, 'memory-evolve: prompt stylesheet')
+  }, 'maestro-memory: prompt stylesheet')
 
   // Web UI Settings styles (ui- prefix, injected independently). Styles alone have no side effects: filter rules
   // depend on html[data-dsh-ui-filter] (set after session-filter.ts activates);
@@ -1796,7 +1812,7 @@ export function apply(ctx: Context): void {
     tag.textContent = uiSettingsStyles
     document.head.appendChild(tag)
     return () => { tag.remove() }
-  }, 'memory-evolve: ui-settings stylesheet')
+  }, 'maestro-memory: ui-settings stylesheet')
 
   // Mermaid rendering styles (me-mermaid- prefix, injected persistently). Styles alone have no side effects
   // (.me-mermaid-wrap appears only after the renderer replaces a code block), persistently injected like ui-settings;
@@ -1811,7 +1827,7 @@ export function apply(ctx: Context): void {
     tag.textContent = mermaidStyles
     document.head.appendChild(tag)
     return () => { tag.remove() }
-  }, 'memory-evolve: mermaid stylesheet')
+  }, 'maestro-memory: mermaid stylesheet')
 
   // Session bookmark styles (bm- prefix, injected persistently). Styles are persistent with no side effects; real switch
   // lives below: star + Bookmarks tab register only after probing /api/bookmarks/state succeeds.
@@ -1824,7 +1840,7 @@ export function apply(ctx: Context): void {
     tag.textContent = bookmarkStyles
     document.head.appendChild(tag)
     return () => { tag.remove() }
-  }, 'memory-evolve: bookmark stylesheet')
+  }, 'maestro-memory: bookmark stylesheet')
 
   // Advisor floating panel styles (advisor- prefix): panel portals to body, so styles
   // must be injected persistently from the client entry, not tied to any conversation.view Tab lifecycle.
@@ -1837,7 +1853,7 @@ export function apply(ctx: Context): void {
     tag.textContent = advisorStyles
     document.head.appendChild(tag)
     return () => { tag.remove() }
-  }, 'memory-evolve: advisor stylesheet')
+  }, 'maestro-memory: advisor stylesheet')
 
   // In-app notification bell styles (me-notify- prefix): bell portals to body, styles must
   // be injected persistently from the client entry (like the Advisor panel, not tied to any Tab).
@@ -1850,7 +1866,7 @@ export function apply(ctx: Context): void {
     tag.textContent = notificationStyles
     document.head.appendChild(tag)
     return () => { tag.remove() }
-  }, 'memory-evolve: notification stylesheet')
+  }, 'maestro-memory: notification stylesheet')
 
   // In-app notification bell (top-right): probe host /api/notifications/unread — mount only on success
   // (mounted only when notifyEnabled exposes the API; 404 keeps the bell hidden).
@@ -1871,7 +1887,7 @@ export function apply(ctx: Context): void {
   ctx.effect(() => () => {
     notifyBellCancelled = true
     disposeNotifyBell?.()
-  }, 'memory-evolve: notification bell')
+  }, 'maestro-memory: notification bell')
 
   // Conversation page top tab order (2026-08-11 decision: Memory / Skills / Todos / COI Dispatch / Broadcast
   // Prompts / Infinite Canvas / Memory Sync / Model Settings / Bookmarks / Web UI Settings / Maestro Memory Settings; order
@@ -1925,7 +1941,7 @@ export function apply(ctx: Context): void {
     todoTabLifecycle.setEnabled(detail?.todoEnabled !== false)
   }
   window.addEventListener(RUNTIME_CONFIG_CHANGED, onRuntimeConfigChanged)
-  ctx.effect(() => () => window.removeEventListener(RUNTIME_CONFIG_CHANGED, onRuntimeConfigChanged), 'memory-evolve: todo tab runtime listener')
+  ctx.effect(() => () => window.removeEventListener(RUNTIME_CONFIG_CHANGED, onRuntimeConfigChanged), 'maestro-memory: todo tab runtime listener')
   // Settings tab (Maestro Memory Settings, order 120 at the end): guide + config + version.
   // Red dot: when a new release is detected the label switches to the \uD83D\uDD34 variant (driven by updateBadgeCount, re-register
   // takes effect; one registration is enough when no dot, re-register only on badge change).
@@ -2025,7 +2041,7 @@ export function apply(ctx: Context): void {
       registerSettingsTab()
       pollBadge()
       const timer = setInterval(pollBadge, BADGE_POLL_MS)
-      ctx.effect(() => () => clearInterval(timer), 'memory-evolve: memory tab badge poller')
+      ctx.effect(() => () => clearInterval(timer), 'maestro-memory: memory tab badge poller')
       // Version check: one lazy check on entering the Web UI (skip git within the 24h cache).
       // On completion sync updateBadgeCount + re-register immediately (30s polling is too slow);
       // badge-change listener is already registered; later VersionTabView actions go through the event channel.
@@ -2045,7 +2061,7 @@ export function apply(ctx: Context): void {
       // label updates without waiting for the next 30s poll.
       const onTabChanged = (): void => pollBadge()
       window.addEventListener('maestro-memory:badge-change', onTabChanged)
-      ctx.effect(() => () => window.removeEventListener('maestro-memory:badge-change', onTabChanged), 'memory-evolve: memory tab badge listener')
+      ctx.effect(() => () => window.removeEventListener('maestro-memory:badge-change', onTabChanged), 'maestro-memory: memory tab badge listener')
     })
     .catch(() => { /* the tab is optional; a failure just leaves it hidden */ })
   ctx.effect(() => () => {
@@ -2054,20 +2070,20 @@ export function apply(ctx: Context): void {
     disposeSkillsTab?.()
     todoTabLifecycle.dispose()
     disposeSettingsTab?.()
-  }, 'memory-evolve: memory tabs')
+  }, 'maestro-memory: memory tabs')
 
   // Memory Sync tab cleanup (registration happens after probing /api/config;
   // registerSyncTab already removes the old slot on re-register; this covers plugin unload —
   // P1-2 review: without it the Sync tab slot leaks on unload/hot-reload).
   ctx.effect(() => () => {
     disposeSyncTab?.()
-  }, 'memory-evolve: sync tab')
+  }, 'maestro-memory: sync tab')
 
   // Model Settings tab cleanup (registration happens after probing /api/config —
   // same independent switch modelsEnabled as other modules).
   ctx.effect(() => () => {
     disposeModelsTab?.()
-  }, 'memory-evolve: models tab')
+  }, 'maestro-memory: models tab')
 
   // COI Dispatch tab (second conversation.view slot): probe the host COI API
   // and register only if it exists (coiEnabled=false yields 404 and the tab stays hidden). Label carries a red dot
@@ -2120,17 +2136,17 @@ export function apply(ctx: Context): void {
       registerCoiTab()
       pollCoiRunning()
       const coiTimer = setInterval(pollCoiRunning, BADGE_POLL_MS)
-      ctx.effect(() => () => clearInterval(coiTimer), 'memory-evolve: coi tab badge poller')
+      ctx.effect(() => () => clearInterval(coiTimer), 'maestro-memory: coi tab badge poller')
       // Re-check the red dot immediately after dispatch / task status changes (CoIView fires badge-change).
       const onCoiBadgeChange = (): void => pollCoiRunning()
       window.addEventListener('maestro-memory:badge-change', onCoiBadgeChange)
-      ctx.effect(() => () => window.removeEventListener('maestro-memory:badge-change', onCoiBadgeChange), 'memory-evolve: coi tab badge listener')
+      ctx.effect(() => () => window.removeEventListener('maestro-memory:badge-change', onCoiBadgeChange), 'maestro-memory: coi tab badge listener')
     })
     .catch(() => { /* COI disabled: keep tab hidden */ })
   ctx.effect(() => () => {
     coiCancelled = true
     disposeCoiTab?.()
-  }, 'memory-evolve: coi tab')
+  }, 'maestro-memory: coi tab')
 
   // Advisor occupies only strict-session header.actions: the same component renders the header toggle
   // and portals the floating panel via createPortal(document.body); it must not register a conversation.view Tab.
@@ -2145,13 +2161,13 @@ export function apply(ctx: Context): void {
     }, (props) => AdvisorHost({ ...props, t })))
   ctx.effect(() => () => {
     disposeAdvisor?.()
-  }, 'memory-evolve: advisor panel')
+  }, 'maestro-memory: advisor panel')
 
   // DSH reconnects change the host in-memory ring / connection generation; after converting to a browser event,
   // each session store cancels the old request, clears the after cursor and immediately re-syncs.
   ctx.effect(() => ctx.on('connection/reset', () => {
     if (typeof window !== 'undefined') window.dispatchEvent(new Event(ADVISOR_CONNECTION_RESET_EVENT))
-  }), 'memory-evolve: advisor connection reset')
+  }), 'maestro-memory: advisor connection reset')
 
   // Session identity: header "⧉ Copy session ID" / "✎ Alias" buttons — **belong to session
   // orchestration / identity** (2026-08-09 decision: not a broadcast feature; moved from broadcastEnabled
@@ -2176,7 +2192,7 @@ export function apply(ctx: Context): void {
   ctx.effect(() => () => {
     sessionHeaderCancelled = true
     disposeCopyId?.()
-  }, 'memory-evolve: session header buttons')
+  }, 'maestro-memory: session header buttons')
 
   // Session Broadcast management tab (conversation.view): follows broadcastEnabled — probe
   // /memory-evolve/api/broadcast and register only if present (404 when disabled, tab stays hidden).
@@ -2198,7 +2214,7 @@ export function apply(ctx: Context): void {
   ctx.effect(() => () => {
     broadcastTabCancelled = true
     disposeBroadcastTab?.()
-  }, 'memory-evolve: broadcast tab')
+  }, 'maestro-memory: broadcast tab')
 
   // Web UI Settings module (dsh-ui-settings): **independent submodule**. Probe host
   // /api/ui-settings/state (uiSettingsEnabled switch, off by default) — on success:
@@ -2258,7 +2274,7 @@ export function apply(ctx: Context): void {
         mermaidRenderer.setEnabled(next.mermaidRender)
       }
       window.addEventListener(FEATURES_EVENT, onFeaturesChanged)
-      ctx.effect(() => () => window.removeEventListener(FEATURES_EVENT, onFeaturesChanged), 'memory-evolve: ui-settings features listener')
+      ctx.effect(() => () => window.removeEventListener(FEATURES_EVENT, onFeaturesChanged), 'maestro-memory: ui-settings features listener')
       // 2. Register the "Web UI Settings" tab.
       disposeUiSettingsTab = ctx.slots.inject('conversation.view', () =>
         ctx.slots.register({
@@ -2277,7 +2293,7 @@ export function apply(ctx: Context): void {
     disposeWideBubble?.()
     disposeContextMeterWarn?.()
     disposeMermaidRender?.()
-  }, 'memory-evolve: ui-settings tab')
+  }, 'maestro-memory: ui-settings tab')
 
   // Prompts tab (fourth conversation.view entry): Prompt Manager. Follow host
   // API probe to register (prompts is a permanent plugin capability, no independent switch). Label carries a red-dot
@@ -2318,16 +2334,16 @@ export function apply(ctx: Context): void {
       registerPromptTab()
       pollPromptBadge()
       const promptBadgeTimer = setInterval(pollPromptBadge, BADGE_POLL_MS)
-      ctx.effect(() => () => clearInterval(promptBadgeTimer), 'memory-evolve: prompt tab badge poller')
+      ctx.effect(() => () => clearInterval(promptBadgeTimer), 'maestro-memory: prompt tab badge poller')
       const onPromptBadgeChange = (): void => pollPromptBadge()
       window.addEventListener('maestro-memory:badge-change', onPromptBadgeChange)
-      ctx.effect(() => () => window.removeEventListener('maestro-memory:badge-change', onPromptBadgeChange), 'memory-evolve: prompt tab badge listener')
+      ctx.effect(() => () => window.removeEventListener('maestro-memory:badge-change', onPromptBadgeChange), 'maestro-memory: prompt tab badge listener')
     })
     .catch(() => { /* Host unavailable: keep tab hidden */ })
   ctx.effect(() => () => {
     promptCancelled = true
     disposePromptTab?.()
-  }, 'memory-evolve: prompt tab')
+  }, 'maestro-memory: prompt tab')
 
   // Session bookmarks (session bookmarks): **independent submodule**. Probe host
   // /api/bookmarks/state (bookmarkEnabled switch, off by default) — on success:
@@ -2385,7 +2401,7 @@ export function apply(ctx: Context): void {
     disposeBookmarkInjector?.()
     disposeBookmarkCapture?.()
     disposeBookmarkTab?.()
-  }, 'memory-evolve: bookmarks')
+  }, 'maestro-memory: bookmarks')
 
   // Infinite canvas (canvas-hub): frontend phase-1 Grok implementation (2026-08-13 decision).
   // cg- prefix. Registration params id: canvas-hub / label: Canvas / order: 80 (final).
@@ -2414,5 +2430,5 @@ export function apply(ctx: Context): void {
   ctx.effect(() => () => {
     canvasCancelled = true
     disposeCanvasTab?.()
-  }, 'memory-evolve: canvas-tab')
+  }, 'maestro-memory: canvas-tab')
 }
