@@ -6,6 +6,14 @@ All version changes for this repository, in reverse chronological order.
 
 ---
 
+## v0.1.0-maestro — 2026-08-24
+
+### Changed
+
+- **v0.1.0-maestro — Rebrand to @ddtcorex/dsh-maestro-memory, English-only, single-owner core** — preserves `~/.dsh/memories` files in place (in-place adoption, SHA-256 verified backup and rollback), single-owner core (memory + todos + confirmation queue + bounded snapshot), English-only primary docs with Chinese archived as `*.zh-legacy.md` (see `README.zh-legacy.md`, `README.zh-legacy2.md`, `docs/*.zh-legacy.md`).
+
+---
+
 ## 2026-08-17
 
 ### Fixed
