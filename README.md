@@ -1,55 +1,71 @@
-# dsh-maestro-memory — Durable Memory & Todos for DeepSeek Harness
+# dsh-maestro-memory
 
-> **One sentence:** Give the AI in DSH cross-session durable memory and todos — **the more you use it, the more it understands you, and switching sessions never loses context.**
+## Purpose
 
-This is the Maestro single-owner replacement for `dsh-memory-evolve`. It preserves your existing `~/.dsh/memories` files in place (in-place adoption, SHA-256 verified backup and rollback) and keeps only the durable core: **layered memory + todos + confirmation queue + bounded snapshot injection**. Everything else (COI, advisor, notify, canvas, etc.) is intentionally out of scope for v1 and will live as separate optional plugins if needed.
+Durable, user-governed memory and todos for DeepSeek Harness (DSH) — a small single-owner replacement for `dsh-memory-evolve` that preserves your existing `~/.dsh/memories` files in place.
 
-- **Package:** `@ddtcorex/dsh-maestro-memory`
-- **Plan & architecture:** `docs/plans/2026-08-24-dsh-maestro-memory-plan.md` (source-grounded rebuild; staged replacement, not a 1:1 port)
-- **Related docs:** [Changelog](docs/CHANGELOG.en.md) · [Changelog (zh legacy)](docs/CHANGELOG.md)
+> **One sentence:** Give the AI in DSH cross-session durable memory and todos — the more you use it, the more it understands you, and switching sessions never loses context.
 
----
+- **Package:** `@ddtcorex/dsh-maestro-memory` (`cordis.patch.yml` id `maestro-memory`)
+- **Plan:** `docs/plans/2026-08-24-dsh-maestro-memory-plan.md` (source-grounded staged replacement, not a 1:1 port)
+- **Architecture:** `docs/architecture.md` (M0 boundary audit: tools, systemPrompt, connection.rpc, conversation.view)
+- **Changelog:** `docs/CHANGELOG.en.md`
 
-## Quick start (install)
+Reference workflows: [`dsh-maestro-harness/AGENTS.md`](../dsh-maestro-harness/AGENTS.md) and [`dsh-maestro-harness/CLAUDE.md`](../dsh-maestro-harness/CLAUDE.md) — same Superpowers + Git + security conventions apply here.
 
-The package ships `cordis.patch.yml` (`dsh.bundle.patch`), so `dsh plugin add` registers the host side automatically — no manual patch needed.
+## Workflow: Superpowers skills are mandatory
+
+Every change to this repository MUST follow the Superpowers skill workflow, in order:
+
+1. **brainstorming** — explore intent, requirements, and design before writing any code; record the outcome in `docs/superpowers/specs/` (`YYYY-MM-DD-<topic>-design.md`).
+2. **writing-plans** — turn an approved spec into a task-by-task plan with exact test and implementation sketches in `docs/superpowers/plans/` (`YYYY-MM-DD-<topic>.md`).
+3. **executing-plans** — implement task by task with strict TDD: write the failing test first, verify RED, implement, verify GREEN, then commit that task as its own commit before starting the next.
+
+Do not skip ahead to implementation, batch multiple tasks into one commit, or commit while a task's tests are red. Trivial mechanical fixes may go straight to a commit but still need tests when behavior changes.
+
+## Git workflow
+
+- Never commit to `master` directly; batch related work on a feature branch (`feat/...`, `fix/...`). One TDD task = one commit while executing a plan.
+- Conventional commit subjects, imperative mood.
+- Push the branch and open an MR when the batch is green; rebase instead of merging master into the branch when the base moves.
+- `origin` is `git@kai-github:ddtcorex/dsh-maestro-memory.git` (private, default branch `master`).
+
+## Layout
+
+- `src/host/` — Cordis host plugin (`storage/legacy-format.ts`, `storage/layout.ts`, `storage/atomic-store.ts`, `memory/store.ts`, `todo/store.ts`, `review/queue.ts`, `migration/service.ts`, `prompt/snapshot.ts`, `rpc/server.ts`, `index.ts` with `maestroMemory`/`maestroMemoryStore`/`maestroTodoStore`/`maestroMemoryMigration` services and `maestro-memory/changed` events).
+- `src/client/` — DSH client bundle (`conversation.view` id `maestro-memory` order 40, internal Memory/Review/Todos tabs, package-private RPC `/dsh-maestro-memory`).
+- `tests/` — Vitest specs for every host behavior (`legacy-format.spec.ts`, `storage.spec.ts`, `atomic-store.spec.ts`, `memory-m2.spec.ts`, `todo-m3.spec.ts`, `migration.spec.ts`, etc.).
+- `docs/architecture.md` — seam table + disk schema + prompt contract; `README.md` is the operator guide.
+- `scripts/migrate.mjs` — migration CLI (`--root`, `--dry-run`/`--apply`/`--verify`).
+
+Build outputs in `lib/` (`lib/client.js` via `scripts/build-client.mjs`) are generated — never edit by hand.
+
+## Development
+
+Run from the repository root:
 
 ```sh
-# 1. Add to the web profile (local link during development)
-dsh plugin --profile web add link:/home/kai/Work/htdocs/maestro-harness/dsh-maestro-memory
-
-# 2. Restart dsh web when convenient (skill provider needs a restart to load;
-#    never kill the live dsh web process serving a session — ask for a window,
-#    see safe-dsh-web-update).
+pnpm install
+npm test          # Vitest (9 files, 148 tests)
+npm run verify    # tsc --noEmit (host + client)
+npm run build     # tsc + client bundle (CJS factory, window.__ModuleLoader__)
+node scripts/migrate.mjs --root ~/.dsh/memories            # inspect (read-only)
+node scripts/migrate.mjs --root /tmp/mem --apply            # backup + adopt
+node scripts/migrate.mjs --root /tmp/mem --verify           # verify
 ```
 
-> Do NOT manually `insert` this plugin into `~/.dsh/profiles/web/cordis.patch.yml` — the bundle patch already registers it; a duplicate id crashes the loader.
-
-**Changing config** (e.g. per-turn review): override by id in the profile patch (top-level, not insert):
-
-```yaml
-- id: maestro-memory
-  config:
-    reviewEnabled: true
-    reviewInterval: 10
-```
-
-To temporarily disable: `disabled: true` on the same id. To uninstall: `dsh plugin --profile web remove @ddtcorex/dsh-maestro-memory`.
-
----
+Run `npm test` after host changes, `npm run verify` after TypeScript changes, `npm run build` after editing `src/client/`. Do not kill/restart the live `dsh web` process serving a session — use `safe-dsh-web-update` with user-approved timing (see `dsh-maestro-harness/AGENTS.md` lessons).
 
 ## What v1 ships
 
 - **Five memory tracks:** `memory` (global) / `user` / `project` (`projects/<sha1(cwd)[:12]>/KEY.md`) / `daily` (`daily/YYYY-MM-DD.md`) / `project log` (`projects/<hash>/MEMORY.md`), plus archives and branch-scoped `KEY` entries with progressive disclosure (`[mem-xxxx]` ids + `expand`).
-- **Todos:** four tracks `life / work / project / daily` with stable ids, statuses, due/quadrant, bounded smart views.
+- **Todos:** four tracks `life / work / project / daily` with stable ids, statuses, due/quadrant, bounded smart views (max 8).
 - **Confirmation queue:** model-proposed `key`/`user` writes go through `SUGGESTIONS.jsonl` and require explicit human approve/edit/reject.
-- **Bounded snapshot:** `systemPrompt.context` injects `USER + global MEMORY + current-project KEY` (deterministic, capped); daily/project logs are queryable, not injected. Includes session-id header and end-of-turn write discipline prompt.
-- **Tools (compat):** `memory` and `dtodo` (same names as before). `skill_manage` only if the optional skills module is explicitly enabled. Optional compat names: `memory_suggest`, `memory_review_status`, `/memory_review`.
-- **UI:** one `conversation.view` tab `maestro-memory` (order 40) with internal Memory / Review queue / Todos tabs. Uses package-private RPC `ctx.connection.rpc.handle('/dsh-maestro-memory', ...)` — no HTTP.
+- **Bounded snapshot:** `systemPrompt.context` injects `USER + global MEMORY + current-project KEY` (deterministic, capped); daily/project logs are queryable, not injected.
+- **Tools (compat):** `memory` and `dtodo` (same names as before). `skill_manage` only if the optional skills module is explicitly enabled.
+- **UI:** one `conversation.view` tab `maestro-memory` (order 40) with internal Memory / Review queue / Todos tabs. Uses `ctx.connection.rpc.handle('/dsh-maestro-memory', ...)` — no HTTP.
 
-**Intentionally not in v1:** COI / external CLI dispatch, advisor, notify / `de_channel_send` / `de_notify`, local search, prompt library, model registry, bookmarks / mermaid / canvas, DOM hacks. Propose any of those as a separate plugin later.
-
----
+**Intentionally not in v1:** COI / external CLI dispatch, advisor, notify / `de_channel_send`, local search, prompt library, model registry, bookmarks / mermaid / canvas, DOM hacks. Propose any as a separate plugin later.
 
 ## Migration from dsh-memory-evolve
 
@@ -60,26 +76,18 @@ To temporarily disable: `disabled: true` on the same id. To uninstall: `dsh plug
 5. **Cut over**: profile with old plugin removed, new plugin as sole owner; live-read every track before first mutation.
 6. **Rollback**: restore files named in the manifest if needed; before any writes rollback is just a profile change.
 
-See the plan's *Migration and rollback* section for the full table.
+## Security
+
+- Never print, commit, or add fixture values for secrets. Use obviously synthetic values in tests and docs.
+- No cloud service, database rewrite, telemetry, or sync in v1; M5 sync (Git-backed) is opt-in and disabled means zero network activity.
+- Secrets must never be echoed to the client; new secret-bearing fields need masking + constant-time comparison.
+
+## Documentation
+
+Keep current behavior in `README.md` and `docs/architecture.md`. Do not add plans, transient investigation logs, or duplicate specifications under `docs/`; capture only durable operator and architecture knowledge. The one exception is Superpowers artifacts: specs under `docs/superpowers/specs/` and plans under `docs/superpowers/plans/` are kept as the design record for each change batch.
 
 ---
 
-## Development
+*English is the primary language for code, docs and UI. No Chinese is carried over.*
 
-```sh
-pnpm install
-npm test          # Vitest (new core) — legacy: node --test 'tests/*.test.js'
-npm run build     # tsc + client bundle (CJS factory via esbuild, window.__ModuleLoader__)
-```
-
-Every PR: failing test → minimal implementation → focused tests → full build/typecheck → reviewable commit. M0 validates live DSH seams (`tools`, `systemPrompt`, `connection.rpc`, `conversation.view`) before any implementation.
-
----
-
-## Three principles (kept from the original)
-
-1. **AI proposes, you confirm:** every write that changes AI behavior goes through the queue.
-2. **Don't reinvent the wheel:** don't touch what DSH core already does.
-3. **Inside vs outside, complementary:** internal sessions for context-heavy work, external agents for heavy one-shots; memory chains them.
-
-*English is the primary language for code, docs and UI. No Chinese is carried over by default.*
+*Reference: `dsh-maestro-harness/AGENTS.md` and `dsh-maestro-harness/CLAUDE.md` for full workflow, Git, layout and security conventions.*
