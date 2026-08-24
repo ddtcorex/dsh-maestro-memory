@@ -11,8 +11,6 @@ Durable, user-governed memory and todos for DeepSeek Harness (DSH) that preserve
 - **Architecture:** `docs/architecture.md` (M0 boundary audit: tools, systemPrompt, connection.rpc, conversation.view)
 - **Changelog:** `docs/CHANGELOG.md`
 
-Reference workflows: [`dsh-maestro-harness/AGENTS.md`](../dsh-maestro-harness/AGENTS.md) and [`dsh-maestro-harness/CLAUDE.md`](../dsh-maestro-harness/CLAUDE.md) — same Superpowers + Git + security conventions apply here.
-
 ## Workflow: Superpowers skills are mandatory
 
 Every change to this repository MUST follow the Superpowers skill workflow, in order:
@@ -54,7 +52,7 @@ node scripts/migrate.mjs --root /tmp/mem --apply            # backup + adopt
 node scripts/migrate.mjs --root /tmp/mem --verify           # verify
 ```
 
-Run `npm test` after host changes, `npm run verify` after TypeScript changes, `npm run build` after editing `src/client/`. Do not kill/restart the live `dsh web` process serving a session — use `safe-dsh-web-update` with user-approved timing (see `dsh-maestro-harness/AGENTS.md` lessons).
+Run `npm test` after host changes, `npm run verify` after TypeScript changes, `npm run build` after editing `src/client/`. Do not kill/restart the live `dsh web` process serving a session — ask for a convenient restart window.
 
 ## What v1 ships
 
@@ -85,13 +83,3 @@ Run `npm test` after host changes, `npm run verify` after TypeScript changes, `n
 ## Documentation
 
 Keep current behavior in `README.md` and `docs/architecture.md`. Do not add plans, transient investigation logs, or duplicate specifications under `docs/`; capture only durable operator and architecture knowledge. The one exception is Superpowers artifacts: specs under `docs/superpowers/specs/` and plans under `docs/superpowers/plans/` are kept as the design record for each change batch.
-
----
-
-*Reference: `dsh-maestro-harness/AGENTS.md` and `dsh-maestro-harness/CLAUDE.md` for full workflow, Git, layout and security conventions.*
-
----
-
-## References
-
-This project was initially forked from [`csyangwen/dsh-memory-evolve`](https://github.com/csyangwen/dsh-memory-evolve) and has been fully rebranded and rebuilt as `@ddtcorex/dsh-maestro-memory` — EN-only, single-owner core with in-place adoption. No further reference to the original fork appears elsewhere in this codebase.
