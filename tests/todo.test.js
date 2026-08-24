@@ -31,6 +31,24 @@ function dayAfter(stamp) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
+test('dtodo tool: every input parameter is a JSON Schema object', () => {
+  const tool = todoToolDefinition({ todoToolName: 'dtodo' }, {})
+  const { properties } = tool.parameters
+  const expected = [
+    'action', 'target', 'content', 'important', 'urgent', 'quadrant', 'due',
+    'cat', 'status', 'id', 'date', 'all', 'past', 'expired', 'cwd',
+  ]
+
+  assert.deepEqual(Object.keys(properties), expected)
+  for (const [name, schema] of Object.entries(properties)) {
+    assert.equal(typeof schema, 'object', `${name} must be a JSON Schema object`)
+    assert.notEqual(schema, null, `${name} must be a JSON Schema object`)
+  }
+  assert.equal(properties.cwd.type, 'string')
+  assert.match(properties.due.description, /today.*overdue.*all/)
+  assert.match(properties.due.description, /today=今天到期及已逾期/)
+})
+
 /** 一条直接构造的 raw 条目。 */
 function rawEntry(time, id, text, patch = {}) {
   return {
