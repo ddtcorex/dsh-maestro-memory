@@ -9,6 +9,33 @@ export const inject = ['slots', 'locale', 'conversation', 'sessions', 'connectio
 
 const RPC_CHANNEL = '/dsh-maestro-memory'
 
+// Theme-aware style values. DSH exposes these as CSS custom properties that
+// flip for light/dark (see Theme.listTokens). The previous hard-coded light
+// hex values made the view unreadable on the dark theme: an inherited white
+// label on white `#fff`/`#eee` buttons (white-on-white), plus bright `#ccc`/
+// `#ddd` borders and dark `#333`/`#666` text that disappeared against the
+// dark base. Using the --dsw-alias-* tokens keeps it readable in both themes.
+const STYLE = {
+  text: 'var(--dsw-alias-label-primary)',
+  textSec: 'var(--dsw-alias-label-secondary)',
+  borderL1: '1px solid var(--dsw-alias-border-l1)',
+  borderL2: '1px solid var(--dsw-alias-border-l2)',
+  surface: 'var(--dsw-alias-bg-layer-1)',
+  // Active tab/target highlight — a filled overlay that reads as "selected" in
+  // both themes (lighter over dark, grayish over light). Avoids bg-layer-2,
+  // which collapses to white on the light theme.
+  active: 'var(--dsw-alias-interactive-bg-active)',
+  success: 'var(--dsw-alias-state-success-primary)',
+  error: 'var(--dsw-alias-state-error-primary)',
+  // Brand accent keeps white text (it's readable in both themes; the DSH
+  // --dsw-alias-brand-primary token resolves to white here, which would make
+  // white text invisible, so we don't use the token for a solid button fill).
+  brand: '#06c',
+  // Neutral secondary chip (Archive / Cancel / Undo): theme surface + primary label.
+  neutral: 'var(--dsw-alias-bg-layer-2)',
+  onAccent: '#fff', // white text on colored accents — readable in both themes
+}
+
 function useRpc(ctx: any) {
   return React.useCallback(
     (endpoint: string, payload: any) => {
@@ -76,7 +103,7 @@ function ReviewQueueView({ ctx }: { ctx: any }): React.ReactElement {
       'div',
       null,
       React.createElement('div', { style: { opacity: 0.7, marginBottom: 8 } }, 'No pending suggestions'),
-      msg ? React.createElement('div', { style: { fontSize: 12, color: '#666' } }, msg) : null,
+      msg ? React.createElement('div', { style: { fontSize: 12, color: STYLE.textSec } }, msg) : null,
       React.createElement('button', { onClick: load, style: { marginTop: 8 } }, 'Refresh'),
     )
   }
@@ -91,7 +118,7 @@ function ReviewQueueView({ ctx }: { ctx: any }): React.ReactElement {
         'div',
         {
           key: number,
-          style: { border: '1px solid #ddd', borderRadius: 8, padding: 8, marginBottom: 8 },
+          style: { border: STYLE.borderL1, borderRadius: 8, padding: 8, marginBottom: 8 },
         },
         React.createElement('div', { style: { fontWeight: 600 } }, `#${number} [${e.target}]`),
         React.createElement('div', { style: { margin: '4px 0', whiteSpace: 'pre-wrap' } }, e.content),
@@ -110,7 +137,7 @@ function ReviewQueueView({ ctx }: { ctx: any }): React.ReactElement {
             {
               onClick: () => decide('approve', number),
               'data-testid': `approve-${number}`,
-              style: { background: '#2d7', color: '#fff', border: 0, borderRadius: 4, padding: '4px 8px', cursor: 'pointer' },
+              style: { background: STYLE.success, color: STYLE.onAccent, border: 0, borderRadius: 4, padding: '4px 8px', cursor: 'pointer' },
             },
             'Approve',
           ),
@@ -119,7 +146,7 @@ function ReviewQueueView({ ctx }: { ctx: any }): React.ReactElement {
             {
               onClick: () => decide('reject', number),
               'data-testid': `reject-${number}`,
-              style: { background: '#d33', color: '#fff', border: 0, borderRadius: 4, padding: '4px 8px', cursor: 'pointer' },
+              style: { background: STYLE.error, color: STYLE.onAccent, border: 0, borderRadius: 4, padding: '4px 8px', cursor: 'pointer' },
             },
             'Reject',
           ),
@@ -128,14 +155,14 @@ function ReviewQueueView({ ctx }: { ctx: any }): React.ReactElement {
             {
               onClick: () => decide('archive', number),
               'data-testid': `archive-${number}`,
-              style: { background: '#888', color: '#fff', border: 0, borderRadius: 4, padding: '4px 8px', cursor: 'pointer' },
+              style: { background: STYLE.neutral, color: STYLE.text, border: STYLE.borderL1, borderRadius: 4, padding: '4px 8px', cursor: 'pointer' },
             },
             'Archive',
           ),
         ),
       )
     }),
-    msg ? React.createElement('div', { style: { marginTop: 8, fontSize: 12, color: '#333' } }, msg) : null,
+    msg ? React.createElement('div', { style: { marginTop: 8, fontSize: 12, color: STYLE.text } }, msg) : null,
     React.createElement('button', { onClick: load, style: { marginTop: 8 } }, 'Refresh'),
   )
 }
@@ -311,8 +338,9 @@ function TodosView({ ctx }: { ctx: any }): React.ReactElement {
               fontWeight: target === k ? 700 : 400,
               padding: '4px 8px',
               borderRadius: 6,
-              border: '1px solid #ccc',
-              background: target === k ? '#eee' : '#fff',
+              border: target === k ? STYLE.borderL2 : STYLE.borderL1,
+              background: target === k ? STYLE.active : STYLE.surface,
+              color: STYLE.text,
               cursor: 'pointer',
               fontSize: 12,
             },
@@ -365,7 +393,7 @@ function TodosView({ ctx }: { ctx: any }): React.ReactElement {
     ),
     React.createElement(
       'div',
-      { style: { border: '1px solid #eee', borderRadius: 8, padding: 8, marginBottom: 12 } },
+      { style: { border: STYLE.borderL1, borderRadius: 8, padding: 8, marginBottom: 12 } },
       React.createElement('div', { style: { fontWeight: 600, marginBottom: 6, fontSize: 13 } }, 'Add todo'),
       React.createElement('textarea', {
         value: draftContent,
@@ -420,13 +448,13 @@ function TodosView({ ctx }: { ctx: any }): React.ReactElement {
         'button',
         {
           onClick: addTodo,
-          style: { background: '#2d7', color: '#fff', border: 0, borderRadius: 4, padding: '6px 12px', cursor: 'pointer', fontSize: 12 },
+          style: { background: STYLE.success, color: STYLE.onAccent, border: 0, borderRadius: 4, padding: '6px 12px', cursor: 'pointer', fontSize: 12 },
           'data-testid': 'todo-add-btn',
         },
         'Add',
       ),
     ),
-    msg ? React.createElement('div', { style: { fontSize: 12, color: '#333', marginBottom: 8, whiteSpace: 'pre-wrap' } }, msg) : null,
+    msg ? React.createElement('div', { style: { fontSize: 12, color: STYLE.text, marginBottom: 8, whiteSpace: 'pre-wrap' } }, msg) : null,
     loading
       ? React.createElement('div', null, 'Loading todos…')
       : items.length === 0
@@ -438,7 +466,7 @@ function TodosView({ ctx }: { ctx: any }): React.ReactElement {
             ...items.map((it: any) =>
               React.createElement(
                 'div',
-                { key: it.id, style: { border: '1px solid #ddd', borderRadius: 8, padding: 8, marginBottom: 8 } },
+                { key: it.id, style: { border: STYLE.borderL1, borderRadius: 8, padding: 8, marginBottom: 8 } },
                 React.createElement(
                   'div',
                   { style: { fontSize: 12, opacity: 0.7 } },
@@ -510,7 +538,7 @@ function TodosView({ ctx }: { ctx: any }): React.ReactElement {
                           'button',
                           {
                             onClick: () => saveEdit(it),
-                            style: { background: '#2d7', color: '#fff', border: 0, borderRadius: 4, padding: '4px 8px', cursor: 'pointer', fontSize: 12 },
+                            style: { background: STYLE.success, color: STYLE.onAccent, border: 0, borderRadius: 4, padding: '4px 8px', cursor: 'pointer', fontSize: 12 },
                             'data-testid': `todo-save-${it.id}`,
                           },
                           'Save',
@@ -519,7 +547,7 @@ function TodosView({ ctx }: { ctx: any }): React.ReactElement {
                           'button',
                           {
                             onClick: () => setEditId(null),
-                            style: { background: '#888', color: '#fff', border: 0, borderRadius: 4, padding: '4px 8px', cursor: 'pointer', fontSize: 12 },
+                            style: { background: STYLE.neutral, color: STYLE.text, border: STYLE.borderL1, borderRadius: 4, padding: '4px 8px', cursor: 'pointer', fontSize: 12 },
                             'data-testid': `todo-cancel-${it.id}`,
                           },
                           'Cancel',
@@ -537,7 +565,7 @@ function TodosView({ ctx }: { ctx: any }): React.ReactElement {
                           'button',
                           {
                             onClick: () => doneTodo(it),
-                            style: { background: it.status === 'done' ? '#888' : '#2d7', color: '#fff', border: 0, borderRadius: 4, padding: '4px 8px', cursor: 'pointer', fontSize: 12 },
+                            style: { background: it.status === 'done' ? STYLE.neutral : STYLE.success, color: it.status === 'done' ? STYLE.text : STYLE.onAccent, border: it.status === 'done' ? STYLE.borderL1 : 0, borderRadius: 4, padding: '4px 8px', cursor: 'pointer', fontSize: 12 },
                             'data-testid': `todo-done-${it.id}`,
                           },
                           it.status === 'done' ? 'Undo' : 'Done',
@@ -546,7 +574,7 @@ function TodosView({ ctx }: { ctx: any }): React.ReactElement {
                           'button',
                           {
                             onClick: () => startEdit(it),
-                            style: { background: '#06c', color: '#fff', border: 0, borderRadius: 4, padding: '4px 8px', cursor: 'pointer', fontSize: 12 },
+                            style: { background: STYLE.brand, color: STYLE.onAccent, border: 0, borderRadius: 4, padding: '4px 8px', cursor: 'pointer', fontSize: 12 },
                             'data-testid': `todo-edit-${it.id}`,
                           },
                           'Edit',
@@ -555,7 +583,7 @@ function TodosView({ ctx }: { ctx: any }): React.ReactElement {
                           'button',
                           {
                             onClick: () => removeTodo(it),
-                            style: { background: '#d33', color: '#fff', border: 0, borderRadius: 4, padding: '4px 8px', cursor: 'pointer', fontSize: 12 },
+                            style: { background: STYLE.error, color: STYLE.onAccent, border: 0, borderRadius: 4, padding: '4px 8px', cursor: 'pointer', fontSize: 12 },
                             'data-testid': `todo-remove-${it.id}`,
                           },
                           'Remove',
@@ -614,7 +642,7 @@ function SkillsView({ ctx }: { ctx: any }): React.ReactElement {
           ...entries.map((e: any) =>
             React.createElement(
               'div',
-              { key: e.name, style: { border: '1px solid #ddd', borderRadius: 8, padding: 8, marginBottom: 8 } },
+              { key: e.name, style: { border: STYLE.borderL1, borderRadius: 8, padding: 8, marginBottom: 8 } },
               React.createElement('div', { style: { fontWeight: 600 } }, e.name),
               React.createElement('div', { style: { fontSize: 12, opacity: 0.7 } }, `[${e.origin}] ${e.path}`),
               React.createElement('div', { style: { margin: '4px 0', fontSize: 13, whiteSpace: 'pre-wrap' } }, e.description),
@@ -630,7 +658,7 @@ function SkillsView({ ctx }: { ctx: any }): React.ReactElement {
             ),
           ),
         ),
-    msg ? React.createElement('div', { style: { marginTop: 8, fontSize: 12, color: '#333' } }, msg) : null,
+    msg ? React.createElement('div', { style: { marginTop: 8, fontSize: 12, color: STYLE.text } }, msg) : null,
     React.createElement('button', { onClick: load, style: { marginTop: 8, padding: '4px 8px', fontSize: 12 }, 'data-testid': 'skills-refresh' }, 'Refresh'),
     React.createElement('div', { style: { marginTop: 8, fontSize: 11, opacity: 0.6 } }, 'Read-only — model suggestions cannot change skills. Future edits, if approved, will require explicit user action + path containment.'),
   )
@@ -640,7 +668,7 @@ function MemoryView({ ctx }: { ctx: any }): React.ReactElement {
   const [tab, setTab] = React.useState<'memory' | 'review' | 'todos' | 'skills'>('review')
   return React.createElement(
     'div',
-    { style: { padding: 16, fontFamily: 'system-ui, sans-serif' } },
+    { style: { padding: 16, fontFamily: 'system-ui, sans-serif', color: STYLE.text } },
     React.createElement(
       'div',
       { style: { display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' } },
@@ -654,8 +682,9 @@ function MemoryView({ ctx }: { ctx: any }): React.ReactElement {
               fontWeight: tab === k ? 700 : 400,
               padding: '6px 10px',
               borderRadius: 6,
-              border: '1px solid #ccc',
-              background: tab === k ? '#eee' : '#fff',
+              border: tab === k ? STYLE.borderL2 : STYLE.borderL1,
+              background: tab === k ? STYLE.active : STYLE.surface,
+              color: STYLE.text,
               cursor: 'pointer',
             },
             'data-testid': `tab-${k}`,
