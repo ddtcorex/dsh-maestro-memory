@@ -5,7 +5,7 @@
 
 import * as React from 'react'
 
-export const inject = ['slots', 'locale', 'conversation', 'sessions', 'connection'] as const
+export const inject = ['slots', 'sessions', 'connection'] as const
 
 const RPC_CHANNEL = '/dsh-maestro-memory'
 
@@ -34,6 +34,42 @@ const STYLE = {
   // Neutral secondary chip (Archive / Cancel / Undo): theme surface + primary label.
   neutral: 'var(--dsw-alias-bg-layer-2)',
   onAccent: '#fff', // white text on colored accents — readable in both themes
+}
+
+// Scoped design tokens for the view so it reads like a first-class DSH panel.
+// Hover/focus/transition states are impossible with inline styles alone, so we
+// attach a small <style> scoped to the .dshmem container. All colors come from
+// the --dsw-alias-* theme tokens and flip with the DSH light/dark theme.
+const MEM_CSS = `
+.dshmem { color: var(--dsw-alias-label-primary); font-family: system-ui, sans-serif; }
+.dshmem button { font: 13px system-ui, sans-serif; cursor: pointer; transition: filter .12s ease, background .12s ease, border-color .12s ease; }
+.dshmem button:hover { filter: brightness(1.08); }
+.dshmem button:active { filter: brightness(.96); }
+.dshmem button:focus-visible { outline: 2px solid var(--dsw-alias-interactive-bg-active); outline-offset: 2px; }
+.dshmem input, .dshmem textarea, .dshmem select { font: 13px system-ui, sans-serif; color: var(--dsw-alias-label-primary); background: var(--dsw-alias-bg-layer-2); border: 1px solid var(--dsw-alias-border-l1); border-radius: 6px; padding: 5px 8px; }
+.dshmem input:focus, .dshmem textarea:focus, .dshmem select:focus { outline: none; border-color: var(--dsw-alias-border-l2); }
+.dshmem textarea { resize: vertical; }
+.dshmem .chip { display: inline-flex; align-items: center; gap: 4px; font: 13px system-ui, sans-serif; border-radius: 6px; border: 1px solid var(--dsw-alias-border-l1); padding: 6px 10px; font-weight: 400; background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-primary); }
+.dshmem .chip-active { border-color: var(--dsw-alias-border-l2); background: var(--dsw-alias-interactive-bg-active); font-weight: 700; }
+.dshmem .card { border: 1px solid var(--dsw-alias-border-l1); border-radius: 8px; padding: 10px; }
+.dshmem .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.dshmem .muted { color: var(--dsw-alias-label-secondary); }
+`
+
+// Best-effort current-session cwd, derived from the injected `sessions` feed
+// (never `ctx.conversation` — that face is not injectable here, and touching a
+// non-injected service throws `cannot get property ... without inject`).
+// `ctx.sessions.list.getSnapshot()` returns `{ current, byId }`, and each row
+// carries the session's canonical `cwd`. Undefined on a fresh page / no session.
+function sessionCwd(ctx: any): string {
+  try {
+    const snap = ctx?.sessions?.list?.getSnapshot?.()
+    const id: string | undefined = snap?.current
+    if (!id) return ''
+    return (snap?.byId?.[id]?.cwd as string) ?? ''
+  } catch {
+    return ''
+  }
 }
 
 function useRpc(ctx: any) {
@@ -192,13 +228,8 @@ function TodosView({ ctx }: { ctx: any }): React.ReactElement {
     setLoading(true)
     setMsg('')
     try {
-      const payload: any = {}
-      if (target !== 'all') payload.target = target
-      else payload.targets = undefined
-      // Map target 'all' to no target => RPC defaults to all four
       const rpcPayload: any = {
         target: target !== 'all' ? target : undefined,
-        targets: target === 'all' ? undefined : undefined,
         opts: {
           all: showAll,
           past: showPast,
@@ -263,6 +294,22 @@ function TodosView({ ctx }: { ctx: any }): React.ReactElement {
           setMsg(res.message ?? 'done')
           await load()
         } else setMsg(`done failed: ${res?.message ?? res?.error}`)
+      } catch (e: any) {
+        setMsg(`error: ${e?.message ?? String(e)}`)
+      }
+    },
+    [rpc, load],
+  )
+
+  const undoTodo = React.useCallback(
+    async (item: any) => {
+      try {
+        // Re-open a done todo: set status back to pending (only if currently done).
+        const res: any = await rpc('todo.mutate', { action: 'update', target: item.target, id: item.id, status: 'pending' })
+        if (res?.ok) {
+          setMsg(res.message ?? 'undone')
+          await load()
+        } else setMsg(`undo failed: ${res?.message ?? res?.error}`)
       } catch (e: any) {
         setMsg(`error: ${e?.message ?? String(e)}`)
       }
@@ -564,7 +611,7 @@ function TodosView({ ctx }: { ctx: any }): React.ReactElement {
                         React.createElement(
                           'button',
                           {
-                            onClick: () => doneTodo(it),
+                            onClick: () => (it.status === 'done' ? undoTodo(it) : doneTodo(it)),
                             style: { background: it.status === 'done' ? STYLE.neutral : STYLE.success, color: it.status === 'done' ? STYLE.text : STYLE.onAccent, border: it.status === 'done' ? STYLE.borderL1 : 0, borderRadius: 4, padding: '4px 8px', cursor: 'pointer', fontSize: 12 },
                             'data-testid': `todo-done-${it.id}`,
                           },
@@ -664,29 +711,103 @@ function SkillsView({ ctx }: { ctx: any }): React.ReactElement {
   )
 }
 
-function MemoryView({ ctx }: { ctx: any }): React.ReactElement {
-  const [tab, setTab] = React.useState<'memory' | 'review' | 'todos' | 'skills'>('review')
+function MemoryListView({ ctx }: { ctx: any }): React.ReactElement {
+  const rpc = useRpc(ctx)
+  const [track, setTrack] = React.useState<string>('key')
+  const [cwd, setCwd] = React.useState<string>(() => sessionCwd(ctx))
+  const [entries, setEntries] = React.useState<string[]>([])
+  const [loading, setLoading] = React.useState(true)
+  const [msg, setMsg] = React.useState<string>('')
+
+  const needsCwd = track === 'key' || track === 'project'
+  const load = React.useCallback(async () => {
+    setLoading(true)
+    setMsg('')
+    try {
+      if (needsCwd && !cwd.trim()) {
+        setEntries([])
+        setMsg('cwd required for the key/project track')
+        setLoading(false)
+        return
+      }
+      const res: any = await rpc('memory.list', { target: track, cwd: needsCwd ? cwd.trim() : undefined })
+      setEntries(Array.isArray(res?.entries) ? res.entries : [])
+    } catch (e: any) {
+      setMsg(`load failed: ${e?.message ?? String(e)}`)
+    } finally {
+      setLoading(false)
+    }
+  }, [rpc, track, cwd, needsCwd])
+
+  React.useEffect(() => {
+    load()
+  }, [load])
+
   return React.createElement(
     'div',
-    { style: { padding: 16, fontFamily: 'system-ui, sans-serif', color: STYLE.text } },
+    { style: { display: 'flex', flexDirection: 'column', gap: 12 } },
     React.createElement(
       'div',
-      { style: { display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' } },
+      { className: 'row' },
+      (['memory', 'user', 'key', 'project', 'daily'] as const).map((k) =>
+        React.createElement(
+          'button',
+          {
+            key: k,
+            onClick: () => setTrack(k),
+            className: track === k ? 'chip chip-active' : 'chip',
+            'data-testid': `mem-track-${k}`,
+          },
+          k,
+        ),
+      ),
+      needsCwd
+        ? React.createElement('input', {
+            value: cwd,
+            placeholder: 'cwd (for key/project)',
+            onChange: (e: any) => setCwd((e.target as HTMLInputElement).value),
+            'data-testid': 'mem-cwd',
+            style: { flex: 1, minWidth: 180 },
+          })
+        : null,
+      React.createElement('button', { onClick: load, className: 'chip', 'data-testid': 'mem-refresh' }, 'Refresh'),
+    ),
+    msg ? React.createElement('div', { className: 'muted', style: { fontSize: 12 } }, msg) : null,
+    loading
+      ? React.createElement('div', null, 'Loading memory…')
+      : entries.length === 0
+        ? React.createElement('div', { className: 'muted', style: { fontSize: 12 } }, '(no entries)')
+        : React.createElement(
+            'div',
+            null,
+            React.createElement('div', { className: 'muted', style: { fontSize: 12, marginBottom: 6 } }, `${entries.length} entries`),
+            ...entries.map((e: string, idx: number) =>
+              React.createElement(
+                'div',
+                { key: idx, className: 'card', style: { marginBottom: 8 } },
+                React.createElement('div', { style: { whiteSpace: 'pre-wrap' } }, e),
+              ),
+            ),
+          ),
+  )
+}
+
+function MemoryView({ ctx }: { ctx: any }): React.ReactElement {
+  const [tab, setTab] = React.useState<'memory' | 'review' | 'todos' | 'skills'>('memory')
+  return React.createElement(
+    'div',
+    { className: 'dshmem', style: { padding: 16, color: STYLE.text, display: 'flex', flexDirection: 'column' } },
+    React.createElement('style', null, MEM_CSS),
+    React.createElement(
+      'div',
+      { className: 'row', style: { marginBottom: 12 } },
       (['memory', 'review', 'todos', 'skills'] as const).map((k) =>
         React.createElement(
           'button',
           {
             key: k,
             onClick: () => setTab(k),
-            style: {
-              fontWeight: tab === k ? 700 : 400,
-              padding: '6px 10px',
-              borderRadius: 6,
-              border: tab === k ? STYLE.borderL2 : STYLE.borderL1,
-              background: tab === k ? STYLE.active : STYLE.surface,
-              color: STYLE.text,
-              cursor: 'pointer',
-            },
+            className: tab === k ? 'chip chip-active' : 'chip',
             'data-testid': `tab-${k}`,
           },
           k,
@@ -694,7 +815,7 @@ function MemoryView({ ctx }: { ctx: any }): React.ReactElement {
       ),
     ),
     tab === 'memory'
-      ? React.createElement('div', null, 'Memory tracks: memory / user / key / project / daily (use memory tool)')
+      ? React.createElement(MemoryListView, { ctx })
       : tab === 'review'
         ? React.createElement(ReviewQueueView, { ctx })
         : tab === 'todos'
