@@ -9,7 +9,7 @@ Durable, user-governed memory and todos for DeepSeek Harness (DSH) — a small s
 - **Package:** `@ddtcorex/dsh-maestro-memory` (`cordis.patch.yml` id `maestro-memory`)
 - **Plan:** `docs/plans/2026-08-24-dsh-maestro-memory-plan.md` (source-grounded staged replacement, not a 1:1 port)
 - **Architecture:** `docs/architecture.md` (M0 boundary audit: tools, systemPrompt, connection.rpc, conversation.view)
-- **Changelog:** `docs/CHANGELOG.en.md`
+- **Changelog:** `docs/CHANGELOG.md`
 
 Reference workflows: [`dsh-maestro-harness/AGENTS.md`](../dsh-maestro-harness/AGENTS.md) and [`dsh-maestro-harness/CLAUDE.md`](../dsh-maestro-harness/CLAUDE.md) — same Superpowers + Git + security conventions apply here.
 
