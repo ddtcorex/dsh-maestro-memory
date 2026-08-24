@@ -8,3 +8,6 @@
 - insert:
     - id: maestro-memory
       name: '@ddtcorex/dsh-maestro-memory'
+      config:
+        memoryDir: null
+        snapshotOrder: 500
