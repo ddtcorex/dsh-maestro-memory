@@ -425,9 +425,6 @@ export class TodoStore {
       if (d !== 0) return d
       return String(a.time).localeCompare(String(b.time))
     })
-    if (targets.length === 1 && targets[0] === 'project') {
-      selected = [...selected].reverse()
-    }
     const explicit = options.all === true || options.past === true
     const truncated = !explicit && selected.length > DEFAULT_VIEW_LIMIT
     const hint =

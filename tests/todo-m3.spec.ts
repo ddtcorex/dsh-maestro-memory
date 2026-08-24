@@ -175,6 +175,16 @@ describe('M3-PR-A todo four tracks + IDs', () => {
     expect(byCat.items.map((i) => i.text)).toContain('low priority chore')
   })
 
+  it('single project target sorts by the same rank order (not reverse)', () => {
+    const s = new TodoStore(root)
+    const yStr = '2020-01-01'
+    // overdue should rank ahead of a no-due / default-priority item for project too
+    s.addTodo('project', 'overdue proj', { due: yStr }, cwd)
+    s.addTodo('project', 'plain proj', {}, cwd)
+    const list = s.listTodos(['project'], { all: true }, cwd)
+    expect(list.items.map((i) => i.text)).toEqual(['overdue proj', 'plain proj'])
+  })
+
   it('historical daily lookup past/expired', () => {
     const s = new TodoStore(root)
     const today = todayStr()

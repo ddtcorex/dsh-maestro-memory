@@ -243,8 +243,9 @@ describe('M6 skills-browser: path containment helpers for future mutation (read-
 })
 
 describe('M6 skills-browser: RPC read-only integration', () => {
-  it('skills.list via host RPC returns read-only entries', async () => {
+  it('skills.list is read-only and constrained to the resolved default dir', async () => {
     const { apply } = await import('../src/host/index.ts')
+    const { resolveDefaultMaestroSkillsDir } = await import('../src/host/skills-browser.ts')
     // minimal fake ctx to capture RPC handler
     let handler: any = null
     const fakeCtx: any = {
@@ -262,16 +263,35 @@ describe('M6 skills-browser: RPC read-only integration', () => {
     }
     const tmp = await mkdtemp(join(tmpdir(), 'skills-rpc-'))
     try {
-      const skillsDir = join(tmp, 'skills')
-      mkdirSync(join(skillsDir, 'my-skill'), { recursive: true })
-      writeFileSync(join(skillsDir, 'my-skill', 'SKILL.md'), '---\nname: my-skill\ndescription: demo\n---\nbody', 'utf8')
+      // An arbitrary skills dir the client controls must NOT be read by the RPC
+      // (the constrained handler resolves the default maestro-skills checkout).
+      const privateDir = join(tmp, 'private')
+      mkdirSync(join(privateDir, 'my-skill'), { recursive: true })
+      writeFileSync(join(privateDir, 'my-skill', 'SKILL.md'), '---\nname: my-skill\ndescription: demo\n---\nbody', 'utf8')
       apply(fakeCtx, { memoryDir: tmp } as any)
       expect(handler).not.toBeNull()
-      // call skills.list endpoint — should be read-only and return entries
-      const res = await handler('skills.list', { skillsDir })
+
+      // 1. A client-supplied arbitrary dir must not leak entries.
+      const res = await handler('skills.list', { skillsDir: privateDir })
       expect(res.ok).toBe(true)
       expect(Array.isArray(res.entries)).toBe(true)
-      expect(res.entries.find((e: any) => e.name === 'my-skill')).toBeDefined()
+      expect(res.entries.find((e: any) => e.name === 'my-skill')).toBeUndefined()
+
+      // 2. The handler resolves the default maestro-skills checkout.
+      const def = resolveDefaultMaestroSkillsDir()
+      if (def) {
+        const defRes = await handler('skills.list', {})
+        expect(defRes.ok).toBe(true)
+        expect(Array.isArray(defRes.entries)).toBe(true)
+        expect(defRes.entries.length).toBeGreaterThanOrEqual(20)
+        expect(defRes.entries.every((e: any) => e.origin === 'maestro-skills')).toBe(true)
+      } else {
+        // no default checkout present (e.g. CI): empty but ok
+        const defRes = await handler('skills.list', {})
+        expect(defRes.ok).toBe(true)
+        expect(defRes.entries).toEqual([])
+      }
+
       // verify no mutate endpoint
       const mutateRes = await handler('skills.mutate', {})
       expect(mutateRes.ok).toBe(false)
