@@ -52,7 +52,7 @@ describe('§ delimiter', () => {
     expect(serializeEntries([])).toBe('\n')
     expect(serializeEntries(['a'])).toBe('a\n')
     expect(serializeEntries(['a', 'b'])).toBe('a\n§\nb\n')
-    const entries = ['第一条', '第二条\n多行内容', 'third entry']
+    const entries = ['first entry', 'second entry\nmultiline content', 'third entry']
     const text = serializeEntries(entries)
     expect(isCanonical(text)).toBe(true)
     expect(parseEntries(text)).toEqual(entries)
@@ -109,52 +109,52 @@ describe('DSH-only marker', () => {
 
 describe('summaries', () => {
   it('parseEntrySummary: only header position', () => {
-    expect(parseEntrySummary('[2026-08-15] [summary:一句话摘要] 正文内容')).toBe('一句话摘要')
+    expect(parseEntrySummary('[2026-08-15] [summary:one sentence summary] body content')).toBe('one sentence summary')
     expect(
-      parseEntrySummary('[id:deadbeef] [2026-08-15] [branch:main] [dsh-only] [summary:带全套头部] 正文'),
-    ).toBe('带全套头部')
-    expect(parseEntrySummary('[2026-08-15] 正文没有摘要标签')).toBe(null)
-    expect(parseEntrySummary('[2026-08-15] 正文提到 [summary:正文文本] 不算')).toBe(null)
-    expect(parseEntrySummary('[2026-08-15] [summary:真的] [summary:假的] 正文')).toBe('真的')
-    expect(parseEntrySummary('[12:30] [git main] [summary:每日条目摘要] 内容')).toBe('每日条目摘要')
+      parseEntrySummary('[id:deadbeef] [2026-08-15] [branch:main] [dsh-only] [summary:with full header] body'),
+    ).toBe('with full header')
+    expect(parseEntrySummary('[2026-08-15] body without summary tag')).toBe(null)
+    expect(parseEntrySummary('[2026-08-15] body mentioning [summary:body text] does not count')).toBe(null)
+    expect(parseEntrySummary('[2026-08-15] [summary:real] [summary:fake] body')).toBe('real')
+    expect(parseEntrySummary('[12:30] [git main] [summary:daily entry summary] content')).toBe('daily entry summary')
     expect(SUMMARY_TAG_RE).toBeInstanceOf(RegExp)
   })
 
   it('stripEntrySummary: removes only header summary', () => {
-    expect(stripEntrySummary('[2026-08-15] [summary:摘要] 正文')).toBe('[2026-08-15] 正文')
+    expect(stripEntrySummary('[2026-08-15] [summary:summary] body')).toBe('[2026-08-15] body')
     expect(
-      stripEntrySummary('[id:deadbeef] [2026-08-15] [branch:main] [dsh-only] [summary:摘要] 正文'),
-    ).toBe('[id:deadbeef] [2026-08-15] [branch:main] [dsh-only] 正文')
-    expect(stripEntrySummary('[2026-08-15] 正文 [foo] [summary:bar] 结尾')).toBe(
-      '[2026-08-15] 正文 [foo] [summary:bar] 结尾',
+      stripEntrySummary('[id:deadbeef] [2026-08-15] [branch:main] [dsh-only] [summary:summary] body'),
+    ).toBe('[id:deadbeef] [2026-08-15] [branch:main] [dsh-only] body')
+    expect(stripEntrySummary('[2026-08-15] body [foo] [summary:bar] tail')).toBe(
+      '[2026-08-15] body [foo] [summary:bar] tail',
     )
-    expect(stripEntrySummary('[2026-08-15] 普通正文')).toBe('[2026-08-15] 普通正文')
+    expect(stripEntrySummary('[2026-08-15] plain body')).toBe('[2026-08-15] plain body')
   })
 
   it('autoSummary: strips header then takes first line, truncates', () => {
-    expect(autoSummary('[2026-08-15] 构建用 DSH_SOURCE 指定检出根')).toBe(
-      '构建用 DSH_SOURCE 指定检出根',
+    expect(autoSummary('[2026-08-15] build uses DSH_SOURCE to specify checkout root')).toBe(
+      'build uses DSH_SOURCE to specify checkout root',
     )
-    expect(autoSummary('[2026-08-15] [summary:显式摘要] 正文首行')).toBe('正文首行')
+    expect(autoSummary('[2026-08-15] [summary:explicitsummary] first line of body')).toBe('first line of body')
     expect(
-      autoSummary('[id:deadbeef] [2026-08-15] [branch:main] [dsh-only] 全套头部后的正文'),
-    ).toBe('全套头部后的正文')
-    expect(autoSummary('[12:30] [git main] 每日日志的正文行')).toBe('每日日志的正文行')
-    expect(autoSummary('[2026-08-15 08:30] [git dev] 项目日志正文')).toBe('项目日志正文')
+      autoSummary('[id:deadbeef] [2026-08-15] [branch:main] [dsh-only] body after full header'),
+    ).toBe('body after full header')
+    expect(autoSummary('[12:30] [git main] daily log body line')).toBe('daily log body line')
+    expect(autoSummary('[2026-08-15 08:30] [git dev] project logbody')).toBe('project logbody')
     const long = 'x'.repeat(100)
     const out = autoSummary(`[2026-08-15] ${long}`)
     expect(out.length).toBe(80)
     expect(out.endsWith('…')).toBe(true)
-    expect(autoSummary('[2026-08-15] 第一行\n第二行')).toBe('第一行')
+    expect(autoSummary('[2026-08-15] first line\nsecond line')).toBe('first line')
   })
 
   it('stripEntrySummary and parseEntrySummary consistency', () => {
-    const entry = '[2026-08-15] [branch:main] [summary:一致性别丢] 正文内容'
+    const entry = '[2026-08-15] [branch:main] [summary:consistent no drop] body content'
     const parsed = parseEntrySummary(entry)
     const stripped = stripEntrySummary(entry)
-    expect(parsed).toBe('一致性别丢')
+    expect(parsed).toBe('consistent no drop')
     expect(stripped).not.toContain('summary')
-    expect(stripped.endsWith('正文内容')).toBe(true)
+    expect(stripped.endsWith('body content')).toBe(true)
   })
 })
 
@@ -243,11 +243,11 @@ describe('legacy todo grammar', () => {
 
   it('parseTodoEntry: handles done timestamp and category with spaces', () => {
     const raw =
-      '[2026-08-06 21:30] [id: 12345678] [status: done] [done: 2026-08-07 10:00] [cat: 工作]\nDone task'
+      '[2026-08-06 21:30] [id: 12345678] [status: done] [done: 2026-08-07 10:00] [cat: work]\nDone task'
     const item = parseTodoEntry(raw)
     expect(item!.status).toBe('done')
     expect(item!.doneAt).toBe('2026-08-07 10:00')
-    expect(item!.cat).toBe('工作')
+    expect(item!.cat).toBe('work')
   })
 
   it('parseTodoEntry: case-insensitive tags, whitespace tolerant', () => {

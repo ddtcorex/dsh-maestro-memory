@@ -2,7 +2,6 @@
 
 All version changes for this repository, in reverse chronological order.
 
-> [中文](CHANGELOG.md)
 
 ---
 

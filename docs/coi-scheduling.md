@@ -1,11 +1,12 @@
 # COI Scheduling
 
-> Legacy Chinese doc archived as COI-调度.md — see plan for new COI design (M5)
+> Legacy COI docs have been removed — see plan for new COI design (M5)
 
-This is an English stub for the COI (Command-line AI) Scheduling module. The original Chinese documentation is preserved as [`docs/COI-调度.zh-legacy.md`](COI-调度.zh-legacy.md) (and still at `docs/COI-调度.md` for reference).
+This is an English stub for the COI (Command-line AI) Scheduling module. All legacy Chinese documentation has been removed per the rebrand (EN-only). The original content is retained in git history for reference if needed.
 
-The new COI design will be evaluated for a separate optional plugin after the Maestro core (memory + todos) stabilizes — see `docs/plans/2026-08-24-dsh-maestro-memory-plan.md`. Until then, this stub is the primary English entry point; the Chinese files are kept as `*.zh-legacy.md` so no information is lost.
+The new COI design will be implemented in **Milestone 5** per `docs/plans/2026-08-24-dsh-maestro-memory-plan.md` (staged rebuild, not a 1:1 port). Until then, this stub is the primary English entry point.
 
-## Scope (planned, if revived as plugin)
+## Scope (planned)
 
-- Unified dispatch for external CLI agents (kimi / codex / grok / hermes / custom), non-blocking background tasks, log streaming, session-layered recovery, memory injection (opt-in).
+- Optional opt-in COI module, separate from core memory/todos, with explicit user-confirmed pushes and no autonomous network activity.
+- Disabled means zero network/Git activity; conflict resolution never drops either version.

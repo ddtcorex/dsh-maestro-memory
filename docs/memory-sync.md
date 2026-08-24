@@ -1,10 +1,10 @@
 # Memory Sync
 
-> Legacy Chinese doc archived as 记忆同步.md — see plan for new sync design (M5)
+> Legacy sync docs have been removed — see plan for new sync design (M5)
 
-This is an English stub for the Memory Sync module. The original Chinese documentation is preserved as [`docs/记忆同步.zh-legacy.md`](记忆同步.zh-legacy.md) (and still at `docs/记忆同步.md` for reference).
+This is an English stub for the Memory Sync module. All legacy Chinese documentation has been removed per the rebrand (EN-only). The original content is retained in git history (`git log --all -- docs/`) for reference if needed.
 
-The new sync design will be implemented in **Milestone 5** per `docs/plans/2026-08-24-dsh-maestro-memory-plan.md` (staged rebuild, not a 1:1 port). Until then, this stub is the primary English entry point; the Chinese files are kept as `*.zh-legacy.md` so no information is lost.
+The new sync design will be implemented in **Milestone 5** per `docs/plans/2026-08-24-dsh-maestro-memory-plan.md` (staged rebuild, not a 1:1 port).
 
 ## Scope (planned)
 

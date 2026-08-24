@@ -45,7 +45,7 @@ describe('atomic-store: pure helpers', () => {
     expect(ENTRY_DELIMITER).toBe('\n§\n')
   })
   it('parse/serialize round-trips', () => {
-    const entries = ['hello', 'world\nmultiline', '第三条']
+    const entries = ['hello', 'world\nmultiline', 'third entry']
     const text = serializeEntries(entries)
     expect(isCanonical(text)).toBe(true)
     expect(parseEntries(text)).toEqual(entries)
