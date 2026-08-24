@@ -28,6 +28,16 @@ export const DEFAULTS: Required<MaestroMemoryConfig> = {
 export type MemoryTarget = 'memory' | 'user' | 'project' | 'key' | 'daily'
 export type MemoryAction = 'add' | 'list' | 'replace' | 'remove' | 'archive' | 'expand'
 
+const CONTENT_OUTPUT = {
+  schema: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['content'],
+    properties: { content: { type: 'array', items: {} } },
+  },
+  render: (_args: unknown, value: { content: any[] }) => value.content,
+}
+
 export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
   const order = config.snapshotOrder ?? DEFAULTS.snapshotOrder
   const store = new MaestroMemoryStore(config.memoryDir ?? null)
@@ -85,6 +95,7 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
         },
         required: ['action', 'target'],
       },
+      output: CONTENT_OUTPUT,
       execute: async (args: any, exec: any) => {
         const target = args.target as MemoryTarget
         const action = args.action as MemoryAction
@@ -164,6 +175,7 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
         },
         required: ['target', 'content', 'reason'],
       },
+      output: CONTENT_OUTPUT,
       execute: async (args: any, exec: any) => {
         const target = String(args.target ?? '').trim()
         const content = String(args.content ?? '').trim()
@@ -211,6 +223,7 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
         },
         required: ['action'],
       },
+      output: CONTENT_OUTPUT,
       execute: async (args: any, exec: any) => {
         const action = args.action as string
         const cwd: string | undefined = args.cwd ?? exec?.agent?.session?.header?.cwd
@@ -285,7 +298,7 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
   // RPC channel for Review queue — explicit user-click decisions
   ctx.effect(() => {
     const channel = '/dsh-maestro-memory'
-    const handler = async (endpoint: string, payload: any) => {
+    const legacyHandler = async (endpoint: string, payload: any) => {
       switch (endpoint) {
         case 'queue.list': {
           const entries = queue.read()
@@ -514,10 +527,14 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
           return { ok: false, error: `unknown endpoint ${endpoint}` }
       }
     }
+    const handler = async (endpoint: string, payload: unknown, _signal: AbortSignal) => ({
+      ok: true as const,
+      value: await legacyHandler(endpoint, payload),
+    })
     // ctx.connection may be undefined in tests; guard
     const conn = (ctx as any).connection ?? (ctx.get && ctx.get('connection'))
     if (!conn?.rpc?.handle) return () => {}
-    const dispose = conn.rpc.handle(channel, handler)
+    const dispose = conn.rpc.handle(channel, handler, { authority: 'loopback' })
     return () => {
       if (typeof dispose === 'function') dispose()
     }

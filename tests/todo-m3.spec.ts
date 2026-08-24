@@ -25,7 +25,10 @@ function fakeCtx(memoryDir: string) {
     systemPrompt: { context: () => () => {} },
     connection: {
       rpc: {
-        handle: (channel: string, handler: any) => { rpcHandlers.set(channel, handler); return () => {} },
+        handle: (channel: string, handler: any) => {
+          rpcHandlers.set(channel, async (endpoint: string, payload: any) => (await handler(endpoint, payload, new AbortController().signal)).value)
+          return () => {}
+        },
         call: async (channel: string, endpoint: string, payload: any) => {
           const h = rpcHandlers.get(channel)
           if (!h) throw new Error('no handler')

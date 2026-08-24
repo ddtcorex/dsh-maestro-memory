@@ -14,7 +14,11 @@ function useRpc(ctx: any) {
     (endpoint: string, payload: any) => {
       const conn = (ctx as any).connection ?? (ctx as any).get?.('connection')
       if (!conn?.rpc?.call) return Promise.reject(new Error('RPC not available'))
-      return conn.rpc.call(RPC_CHANNEL, endpoint, payload)
+      return conn.rpc.call(RPC_CHANNEL, endpoint, payload).then((result: any) => {
+        if (result?.ok === true) return result.value
+        const message = typeof result?.error?.message === 'string' ? result.error.message : 'RPC request failed'
+        throw new Error(message)
+      })
     },
     [ctx],
   )

@@ -21,6 +21,8 @@ afterEach(async () => {
 function fakeCtx(memoryDir: string) {
   const tools: any[] = []
   const rpcHandlers = new Map<string, any>()
+  const rpcTransportHandlers = new Map<string, any>()
+  const rpcOptions = new Map<string, any>()
   const ctx: any = {
     tools: {
       register: (t: any) => {
@@ -33,8 +35,10 @@ function fakeCtx(memoryDir: string) {
     },
     connection: {
       rpc: {
-        handle: (channel: string, handler: any) => {
-          rpcHandlers.set(channel, handler)
+        handle: (channel: string, handler: any, options: any) => {
+          rpcTransportHandlers.set(channel, handler)
+          rpcHandlers.set(channel, async (endpoint: string, payload: any) => (await handler(endpoint, payload, new AbortController().signal)).value)
+          rpcOptions.set(channel, options)
           return () => {}
         },
         call: async (channel: string, endpoint: string, payload: any) => {
@@ -49,12 +53,44 @@ function fakeCtx(memoryDir: string) {
       return dispose
     },
     get: (name: string) => (name === 'connection' ? ctx.connection : undefined),
-    state: { tools, rpcHandlers },
+    state: { tools, rpcHandlers, rpcTransportHandlers, rpcOptions },
   }
   return ctx
 }
 
 describe('M2-PR-B gated memory_suggest and explicit RPC', () => {
+  it('declares canonical output for every registered tool', () => {
+    const ctx = fakeCtx(root)
+    apply(ctx, { memoryDir: root })
+
+    expect(ctx.state.tools.map((tool: any) => tool.name)).toEqual(['memory', 'memory_suggest', 'dtodo'])
+    for (const tool of ctx.state.tools) {
+      expect(tool.output).toEqual(expect.objectContaining({
+        schema: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['content'],
+          properties: { content: { type: 'array', items: {} } },
+        },
+        render: expect.any(Function),
+      }))
+      expect(tool.output.render({}, { content: [{ type: 'text', text: 'result' }] }))
+        .toEqual([{ type: 'text', text: 'result' }])
+    }
+  })
+
+  it('registers its RPC endpoint for loopback and wraps legacy responses', async () => {
+    const ctx = fakeCtx(root)
+    apply(ctx, { memoryDir: root })
+
+    expect(ctx.state.rpcOptions.get('/dsh-maestro-memory')).toEqual({ authority: 'loopback' })
+    const handler = ctx.state.rpcTransportHandlers.get('/dsh-maestro-memory')
+    await expect(handler('queue.list', {})).resolves.toEqual({
+      ok: true,
+      value: { ok: true, entries: [] },
+    })
+  })
+
   it('memory_suggest queues, does not write directly', async () => {
     const ctx = fakeCtx(root)
     apply(ctx, { memoryDir: root })
