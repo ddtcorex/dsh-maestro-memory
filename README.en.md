@@ -1,10 +1,11 @@
-# dsh-memory-evolve — Usage Scenario Guide
+# dsh-maestro-memory — Usage Scenario Guide (legacy, archived)
 
 > **In one sentence**: Give the AI inside DSH long-term cross-session memory, help you manage todos and skills, and let you orchestrate a team of AI sessions and external AI agents working together — **the more you use it, the more it understands you, and switching sessions never loses context**.
 >
 > This guide is organized around real workflows. Each scenario explains "who it's for, what it can do, how to use it, and what you get."
 >
-> Related docs: [Detailed feature guide](README-详细说明.md) · [Memory sync](docs/记忆同步.md) · [Changelog](docs/CHANGELOG.en.md) · [中文](README.md)
+> **ARCHIVED — this is the legacy dsh-memory-evolve English guide.** The active guide is now [`README.md`](README.md) for `@ddtcorex/dsh-maestro-memory`.
+> Legacy related docs: [Detailed feature guide](README.zh-legacy.md) · [Memory sync](docs/记忆同步.md) · [Changelog](docs/CHANGELOG.en.md)
 
 ---
 
