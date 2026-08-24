@@ -8,6 +8,8 @@ import { SuggestionQueue, enqueueSuggestion, approveSuggestions, rejectSuggestio
 import { resolveMemoryRoot, suggestionsPath, globalArchivePath, userArchivePath, projectKeyArchivePath, todoArchivePath } from './storage/layout.ts'
 import { appendEntryAtomicSync } from './storage/atomic-store.ts'
 import * as migration from './migration/service.ts'
+import { SyncService } from './sync/service.ts'
+import { RealGitAdapter } from './sync/git.ts'
 
 export const inject = ['tools', 'systemPrompt', 'workspaceRegistry', 'connection'] as const
 
@@ -31,6 +33,7 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
   const todoStore = new TodoStore(config.memoryDir ?? null)
   const root = resolveMemoryRoot(config.memoryDir ?? null)
   const queue = new SuggestionQueue(suggestionsPath(root))
+  const syncService = new SyncService(config.memoryDir ?? null, new RealGitAdapter())
 
   ctx.effect(() => {
     const dispose = ctx.systemPrompt.context({
@@ -416,6 +419,68 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
         case 'migration.verify': {
           const res = await migration.verify(root, payload?.runId)
           return { ...res }
+        }
+        case 'sync.enable': {
+          const cwd = String(payload?.cwd ?? '').trim()
+          const remoteUrl = String(payload?.remoteUrl ?? payload?.remote ?? '').trim()
+          const branch = payload?.branch ? String(payload.branch).trim() : undefined
+          if (!cwd) return { ok: false, error: 'cwd required' }
+          if (!remoteUrl) return { ok: false, error: 'remoteUrl required' }
+          const res = syncService.enable(cwd, remoteUrl, branch)
+          return { ...res }
+        }
+        case 'sync.disable': {
+          const cwd = String(payload?.cwd ?? '').trim()
+          if (!cwd) return { ok: false, error: 'cwd required' }
+          const res = syncService.disable(cwd)
+          return { ...res }
+        }
+        case 'sync.status': {
+          const cwd = String(payload?.cwd ?? '').trim()
+          if (!cwd) return { ok: false, error: 'cwd required' }
+          const reveal = payload?.reveal === true
+          // explicit fetch on status when requested
+          if (payload?.fetch === true) {
+            const fetchRes = await syncService.fetch(cwd)
+            if (!fetchRes.ok) return { ok: false, error: fetchRes.error }
+            const st = syncService.status(cwd, reveal)
+            return { ok: true, ...st, fetched: true, conflicts: fetchRes.conflicts }
+          }
+          const st = syncService.status(cwd, reveal)
+          return { ok: true, ...st }
+        }
+        case 'sync.fetch': {
+          const cwd = String(payload?.cwd ?? '').trim()
+          if (!cwd) return { ok: false, error: 'cwd required' }
+          const res = await syncService.fetch(cwd)
+          return { ...res }
+        }
+        case 'sync.push': {
+          const cwd = String(payload?.cwd ?? '').trim()
+          if (!cwd) return { ok: false, error: 'cwd required' }
+          const res = await syncService.push(cwd, payload?.message ? String(payload.message) : undefined)
+          return { ...res }
+        }
+        case 'sync.pull': {
+          const cwd = String(payload?.cwd ?? '').trim()
+          if (!cwd) return { ok: false, error: 'cwd required' }
+          const res = await syncService.pull(cwd)
+          return { ...res }
+        }
+        case 'sync.resolve': {
+          const cwd = String(payload?.cwd ?? '').trim()
+          const id = String(payload?.id ?? '').trim()
+          const choice = String(payload?.choice ?? '').trim() as any
+          if (!cwd) return { ok: false, error: 'cwd required' }
+          if (!id) return { ok: false, error: 'id required' }
+          const res = syncService.resolve(cwd, id, choice)
+          return { ...res }
+        }
+        case 'sync.listConflicts': {
+          const cwd = String(payload?.cwd ?? '').trim()
+          if (!cwd) return { ok: false, error: 'cwd required' }
+          const conflicts = syncService.listConflicts(cwd)
+          return { ok: true, conflicts }
         }
         default:
           return { ok: false, error: `unknown endpoint ${endpoint}` }
