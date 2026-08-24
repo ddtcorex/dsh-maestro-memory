@@ -1,6 +1,7 @@
 /**
  * dsh-maestro-memory — host entry (M2-PR-B: confirmation queue, gated memory_suggest, RPC decide, Review UI)
  */
+import { defineTool } from '@deepseek-ai/dsh-tools'
 import { MaestroMemoryStore } from './memory/store.ts'
 import { TodoStore, resolveQuadrant, DEFAULT_VIEW_LIMIT } from './todo/store.ts'
 import { TODO_TARGETS, TODO_STATUSES } from './storage/legacy-format.ts'
@@ -32,9 +33,8 @@ const CONTENT_OUTPUT = {
   schema: {
     type: 'object',
     additionalProperties: false,
-    required: ['content'],
-    properties: { content: { type: 'array', items: {} } },
-  },
+    properties: { content: { type: 'array', items: { type: 'json' }, required: true } },
+  } as const,
   render: (_args: unknown, value: { content: any[] }) => value.content,
 }
 
@@ -62,38 +62,26 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
   }, 'maestro-memory: snapshot')
 
   ctx.effect(() => {
-    const tool = {
+    const tool = defineTool({
       name: 'memory',
       description: 'Maestro memory (M2: five tracks, query, replace/remove, archive, branch, summary/expand)',
       parameters: {
-        type: 'object',
-        properties: {
-          action: {
-            type: 'string',
-            enum: ['add', 'list', 'replace', 'remove', 'archive', 'expand'],
-            description: 'Memory action',
-          },
-          target: {
-            type: 'string',
-            enum: ['memory', 'user', 'project', 'key', 'daily'],
-            description: 'Memory track (daily=YYYY-MM-DD file, project=per-cwd log, key=per-cwd long-term)',
-          },
-          content: { type: 'string', description: 'Entry content (add) or new content (replace)' },
-          match: { type: 'string', description: 'Unique substring identifying entry (replace/remove/archive)' },
-          filter: { type: 'string', description: 'Content substring filter (list)' },
-          since: { type: 'string', description: 'Start date YYYY-MM-DD (list)' },
-          until: { type: 'string', description: 'End date YYYY-MM-DD (list)' },
-          limit: { type: 'integer', description: 'Max entries (list)' },
-          recent: { type: 'boolean', description: 'Newest first (list)' },
-          branch: { type: 'string', description: 'Branch filter for key (list)' },
-          branches: { type: 'string', description: 'Branch scope csv for key add, e.g. main,dev (empty=all)' },
-          summary: { type: 'string', description: 'One-line summary for key add (progressive disclosure)' },
-          id: { type: 'string', description: 'Entry id for expand (key)' },
-          archived: { type: 'boolean', description: 'Query archive files (list)' },
-          cwd: { type: 'string', description: 'Working directory for project/key tracks' },
-          date: { type: 'string', description: 'Date YYYY-MM-DD for daily track' },
-        },
-        required: ['action', 'target'],
+        action: { type: 'string', required: true, enum: ['add', 'list', 'replace', 'remove', 'archive', 'expand'], description: 'Memory action' },
+        target: { type: 'string', required: true, enum: ['memory', 'user', 'project', 'key', 'daily'], description: 'Memory track (daily=YYYY-MM-DD file, project=per-cwd log, key=per-cwd long-term)' },
+        content: { type: 'string', description: 'Entry content (add) or new content (replace)' },
+        match: { type: 'string', description: 'Unique substring identifying entry (replace/remove/archive)' },
+        filter: { type: 'string', description: 'Content substring filter (list)' },
+        since: { type: 'string', description: 'Start date YYYY-MM-DD (list)' },
+        until: { type: 'string', description: 'End date YYYY-MM-DD (list)' },
+        limit: { type: 'integer', description: 'Max entries (list)' },
+        recent: { type: 'boolean', description: 'Newest first (list)' },
+        branch: { type: 'string', description: 'Branch filter for key (list)' },
+        branches: { type: 'string', description: 'Branch scope csv for key add, e.g. main,dev (empty=all)' },
+        summary: { type: 'string', description: 'One-line summary for key add (progressive disclosure)' },
+        id: { type: 'string', description: 'Entry id for expand (key)' },
+        archived: { type: 'boolean', description: 'Query archive files (list)' },
+        cwd: { type: 'string', description: 'Working directory for project/key tracks' },
+        date: { type: 'string', description: 'Date YYYY-MM-DD for daily track' },
       },
       output: CONTENT_OUTPUT,
       execute: async (args: any, exec: any) => {
@@ -150,7 +138,7 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
           return { content: [{ type: 'text', text: `error: ${e?.message ?? String(e)}` }] }
         }
       },
-    }
+    })
     const dispose = ctx.tools.register(tool)
     return () => {
       if (typeof dispose === 'function') dispose()
@@ -159,21 +147,13 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
 
   // Gated memory_suggest tool — model proposals go to queue, never directly to memory
   ctx.effect(() => {
-    const tool = {
+    const tool = defineTool({
       name: 'memory_suggest',
       description: 'Propose memory/todo for confirmation queue (gated, requires user approve). Targets: memory/user/key/todo-*',
       parameters: {
-        type: 'object',
-        properties: {
-          target: {
-            type: 'string',
-            enum: ['memory', 'user', 'key', 'todo-life', 'todo-work', 'todo-project', 'todo-daily'],
-            description: 'Suggestion target',
-          },
-          content: { type: 'string', description: 'Suggested content' },
-          reason: { type: 'string', description: 'Why it is worth remembering' },
-        },
-        required: ['target', 'content', 'reason'],
+        target: { type: 'string', required: true, enum: ['memory', 'user', 'key', 'todo-life', 'todo-work', 'todo-project', 'todo-daily'] },
+        content: { type: 'string', required: true },
+        reason: { type: 'string', required: true },
       },
       output: CONTENT_OUTPUT,
       execute: async (args: any, exec: any) => {
@@ -190,7 +170,7 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
         const msg = (res as any).hits ? `queued (deduped hits=${(res as any).hits})` : `queued (${res.queued})`
         return { content: [{ type: 'text', text: msg }] }
       },
-    }
+    })
     const dispose = ctx.tools.register(tool)
     return () => {
       if (typeof dispose === 'function') dispose()
@@ -199,29 +179,25 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
 
   // dtodo compatibility tool (four tracks, IDs, status/due/quadrant, smart view, historical lookup)
   ctx.effect(() => {
-    const tool = {
+    const tool = defineTool({
       name: 'dtodo',
       description: 'Todos: life/work/project/daily with IDs, status/due/quadrant, smart view (overdue/today/project/Q1-Q2, limit 8), historical daily lookup',
       parameters: {
-        type: 'object',
-        properties: {
-          action: { type: 'string', enum: ['add', 'list', 'done', 'update', 'remove'], description: 'Todo action' },
-          target: { type: 'string', enum: [...TODO_TARGETS], description: 'Todo track (life/work/project/daily)' },
-          content: { type: 'string', description: 'Todo content (add/update)' },
-          id: { type: 'string', description: 'Todo id (done/update/remove)' },
-          due: { type: 'string', description: 'Due date YYYY-MM-DD' },
-          quadrant: { type: 'string', enum: ['q1', 'q2', 'q3', 'q4'], description: 'Quadrant q1-q4' },
-          important: { type: 'boolean', description: 'Important (maps to quadrant)' },
-          urgent: { type: 'boolean', description: 'Urgent (maps to quadrant)' },
-          cat: { type: 'string', description: 'Category' },
-          status: { type: 'string', enum: [...TODO_STATUSES], description: 'Status for update' },
-          all: { type: 'boolean', description: 'List all (no smart-view limit)' },
-          past: { type: 'boolean', description: 'Include past daily todos' },
-          expired: { type: 'boolean', description: 'Include expired past daily todos (needs past=true)' },
-          cwd: { type: 'string', description: 'Working directory for project track' },
-          date: { type: 'string', description: 'Date YYYY-MM-DD for daily track' },
-        },
-        required: ['action'],
+        action: { type: 'string', required: true, enum: ['add', 'list', 'done', 'update', 'remove'] },
+        target: { type: 'string', enum: [...TODO_TARGETS] },
+        content: { type: 'string' },
+        id: { type: 'string' },
+        due: { type: 'string' },
+        quadrant: { type: 'string', enum: ['q1', 'q2', 'q3', 'q4'] },
+        important: { type: 'boolean' },
+        urgent: { type: 'boolean' },
+        cat: { type: 'string' },
+        status: { type: 'string', enum: [...TODO_STATUSES] },
+        all: { type: 'boolean' },
+        past: { type: 'boolean' },
+        expired: { type: 'boolean' },
+        cwd: { type: 'string' },
+        date: { type: 'string' },
       },
       output: CONTENT_OUTPUT,
       execute: async (args: any, exec: any) => {
@@ -288,7 +264,7 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
           return { content: [{ type: 'text', text: `error: ${e?.message ?? String(e)}` }] }
         }
       },
-    }
+    })
     const dispose = ctx.tools.register(tool)
     return () => {
       if (typeof dispose === 'function') dispose()
