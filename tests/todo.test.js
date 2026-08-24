@@ -31,6 +31,24 @@ function dayAfter(stamp) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
+test('dtodo tool: every input parameter is a JSON Schema object', () => {
+  const tool = todoToolDefinition({ todoToolName: 'dtodo' }, {})
+  const { properties } = tool.parameters
+  const expected = [
+    'action', 'target', 'content', 'important', 'urgent', 'quadrant', 'due',
+    'cat', 'status', 'id', 'date', 'all', 'past', 'expired', 'cwd',
+  ]
+
+  assert.deepEqual(Object.keys(properties), expected)
+  for (const [name, schema] of Object.entries(properties)) {
+    assert.equal(typeof schema, 'object', `${name} must be a JSON Schema object`)
+    assert.notEqual(schema, null, `${name} must be a JSON Schema object`)
+  }
+  assert.equal(properties.cwd.type, 'string')
+  assert.match(properties.due.description, /today.*overdue.*all/)
+  assert.match(properties.due.description, /today=今天到期及已逾期/)
+})
+
 /** 一条直接构造的 raw 条目。 */
 function rawEntry(time, id, text, patch = {}) {
   return {
@@ -244,6 +262,24 @@ test('dtodo tool: add targets project with cwd, work without; list/done/update/r
 
     const badAction = await tool.execute({ action: 'explode' }, exec('/proj/x'))
     assert.equal(badAction.ok, false)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('dtodo tool exposes every parameter as a JSON Schema object', () => {
+  const dir = tempDir()
+  try {
+    const store = new TodoStore(dir)
+    const properties = todoToolDefinition({ todoToolName: 'dtodo' }, store).parameters.properties
+    const expected = ['action', 'target', 'content', 'important', 'urgent', 'quadrant', 'due', 'cat', 'status', 'id', 'date', 'all', 'past', 'expired', 'cwd']
+
+    assert.deepEqual(Object.keys(properties), expected)
+    for (const key of expected) {
+      assert.equal(typeof properties[key], 'object', `${key} must be a JSON Schema object`)
+      assert.equal(typeof properties[key].type, 'string', `${key} must declare a JSON Schema type`)
+      assert.equal(typeof properties[key].description, 'string', `${key} must describe the parameter`)
+    }
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
