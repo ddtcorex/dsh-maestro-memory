@@ -379,6 +379,7 @@ export class MaestroMemoryStore {
     match: string,
     newContent: string,
     cwd?: string,
+    opts: { date?: string } = {},
   ): { ok: true } | { ok: false; error: string; matches?: string[] } {
     try {
       this.assertNotBlocked()
@@ -390,7 +391,12 @@ export class MaestroMemoryStore {
     const newText = String(newContent ?? '').trim()
     if (!oldText) return { ok: false, error: 'empty match' }
     if (!newText) return { ok: false, error: 'empty new content' }
-    const file = this.fileFor(t, cwd)
+    let file: string
+    try {
+      file = this.fileFor(t, cwd, opts.date)
+    } catch (e: any) {
+      return { ok: false, error: e?.message ?? String(e) }
+    }
     // Read + modify + write inside the directory lock so a concurrent append by
     // another process is never clobbered by a stale read (cross-process safety).
     return withLockSync(dirname(file), () => {
@@ -424,6 +430,7 @@ export class MaestroMemoryStore {
     target: MemoryTarget,
     match: string,
     cwd?: string,
+    opts: { date?: string } = {},
   ): { ok: true; removed?: string } | { ok: false; error: string; matches?: string[] } {
     try {
       this.assertNotBlocked()
@@ -433,7 +440,12 @@ export class MaestroMemoryStore {
     const t = normalizeTarget(target)
     const oldText = String(match ?? '').trim()
     if (!oldText) return { ok: false, error: 'empty match' }
-    const file = this.fileFor(t, cwd)
+    let file: string
+    try {
+      file = this.fileFor(t, cwd, opts.date)
+    } catch (e: any) {
+      return { ok: false, error: e?.message ?? String(e) }
+    }
     return withLockSync(dirname(file), () => {
       const entries = readEntriesSync(file)
       // Use ID-immune exact? But remove is substring unique, not exact. Follow legacy: filter includes.

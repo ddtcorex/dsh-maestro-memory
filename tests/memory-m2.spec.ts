@@ -272,6 +272,36 @@ describe('M2 daily date param + always-id key', () => {
     expect(res.ok).toBe(false)
   })
 
+  it('daily remove targets an explicit date (not only today)', () => {
+    store.add('daily', '[08:00] remove-me', undefined, { date: '2026-08-10' })
+    // Today's file must be untouched by the dated remove.
+    store.add('daily', '[08:00] keep-today', undefined)
+    const res = store.remove('daily', 'remove-me', undefined, { date: '2026-08-10' })
+    expect(res.ok).toBe(true)
+    const dated = store.list('daily', undefined, { date: '2026-08-10' })
+    expect(dated).not.toEqual(expect.arrayContaining([expect.stringContaining('remove-me')]))
+    // the same-day entry is unscathed
+    const today = store.list('daily', undefined, { date: todayStr() })
+    expect(today).toEqual(expect.arrayContaining([expect.stringContaining('keep-today')]))
+  })
+
+  it('daily replace targets an explicit date (not only today)', () => {
+    store.add('daily', '[08:00] original text', undefined, { date: '2026-08-11' })
+    const res = store.replace('daily', 'original text', '[08:00] replaced text', undefined, { date: '2026-08-11' })
+    expect(res.ok).toBe(true)
+    const dated = store.list('daily', undefined, { date: '2026-08-11' })
+    expect(dated).toEqual(expect.arrayContaining([expect.stringContaining('replaced text')]))
+    expect(dated).not.toEqual(expect.arrayContaining([expect.stringContaining('original text')]))
+  })
+
+  it('daily remove/replace reject a non-YYYY-MM-DD date', () => {
+    store.add('daily', '[08:00] target', undefined, { date: '2026-08-12' })
+    const rm = store.remove('daily', 'target', undefined, { date: '../../etc/passwd' })
+    expect(rm.ok).toBe(false)
+    const rep = store.replace('daily', 'target', 'new', undefined, { date: '../../etc/passwd' })
+    expect(rep.ok).toBe(false)
+  })
+
   it('key add always emits an id (even without summary) so expand-by-id works', () => {
     const res = store.add('key', '[2026-08-10] plain key entry', cwd)
     expect(res.ok).toBe(true)

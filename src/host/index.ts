@@ -81,7 +81,7 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
         id: { type: 'string', description: 'Entry id for expand (key)' },
         archived: { type: 'boolean', description: 'Query archive files (list)' },
         cwd: { type: 'string', description: 'Working directory for project/key tracks' },
-        date: { type: 'string', description: 'Date YYYY-MM-DD for daily track' },
+        date: { type: 'string', description: 'Date YYYY-MM-DD for daily track (add/list/replace/remove)' },
       },
       output: CONTENT_OUTPUT,
       execute: async (args: any, exec: any) => {
@@ -115,12 +115,12 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
               return { content: [{ type: 'text', text }] }
             }
             case 'replace': {
-              const res = store.replace(target, args.match ?? '', args.content ?? '', cwd)
+              const res = store.replace(target, args.match ?? '', args.content ?? '', cwd, { date: args.date })
               if (!res.ok) return { content: [{ type: 'text', text: `replace failed: ${res.error}` }] }
               return { content: [{ type: 'text', text: 'replaced' }] }
             }
             case 'remove': {
-              const res = store.remove(target, args.match ?? '', cwd)
+              const res = store.remove(target, args.match ?? '', cwd, { date: args.date })
               if (!res.ok) return { content: [{ type: 'text', text: `remove failed: ${res.error}` }] }
               return { content: [{ type: 'text', text: 'removed' }] }
             }
@@ -368,10 +368,10 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
               return store.add(target as any, content ?? '', cwd, { branches: payload?.branches, summary: payload?.summary, date: payload?.date })
             }
             if (action === 'replace') {
-              return store.replace(target as any, match ?? '', content ?? '', cwd)
+              return store.replace(target as any, match ?? '', content ?? '', cwd, { date: payload?.date })
             }
             if (action === 'remove') {
-              return store.remove(target as any, match ?? '', cwd)
+              return store.remove(target as any, match ?? '', cwd, { date: payload?.date })
             }
             if (action === 'archive') {
               return store.archive(target as any, match ?? '', cwd)
