@@ -88,8 +88,6 @@ Keep current behavior in `README.md` and `docs/architecture.md`. Do not add plan
 
 ---
 
-*English is the primary language for code, docs and UI. No Chinese is carried over.*
-
 *Reference: `dsh-maestro-harness/AGENTS.md` and `dsh-maestro-harness/CLAUDE.md` for full workflow, Git, layout and security conventions.*
 
 ---
