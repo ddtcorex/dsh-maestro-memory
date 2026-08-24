@@ -105,7 +105,7 @@ describe('M6 skills-browser: read-only, no mutation surface', () => {
 
   it('host RPC only exposes read endpoints (skills.list)', async () => {
     // Verify host index registers only read endpoint under skills.* and does not expose mutate
-    const text = readFileSync(join('/home/kai/Work/htdocs/maestro-harness/dsh-maestro-memory/src/host/index.ts'), 'utf8')
+    const text = readFileSync(join(process.cwd(), 'src/host/index.ts'), 'utf8')
     // should have skills.list handling
     expect(text).toMatch(/skills\.list/)
     // must NOT contain skills.mutate / skills.write / skills.create in M6
@@ -118,12 +118,12 @@ describe('M6 skills-browser: read-only, no mutation surface', () => {
 
 describe('M6 skills-browser: boundary with maestro-skills — does not alter discovery', () => {
   it('does not register a SkillProvider and does not import ctx.skills', async () => {
-    const src = readFileSync(join('/home/kai/Work/htdocs/maestro-harness/dsh-maestro-memory/src/host/skills-browser.ts'), 'utf8')
+    const src = readFileSync(join(process.cwd(), 'src/host/skills-browser.ts'), 'utf8')
     expect(src).not.toMatch(/ctx\.skills\.registerProvider/)
     expect(src).not.toMatch(/registerProvider/)
     expect(src).not.toMatch(/inject.*skills/)
     // also check host index does not make skills-browser touch ctx.skills
-    const hostSrc = readFileSync(join('/home/kai/Work/htdocs/maestro-harness/dsh-maestro-memory/src/host/index.ts'), 'utf8')
+    const hostSrc = readFileSync(join(process.cwd(), 'src/host/index.ts'), 'utf8')
     // the skills-browser RPC handler should not call ctx.skills
     // simple check: ensure no "skills" provider registration in host
     // (maestro-skills is the only provider, we must not add another)
@@ -132,7 +132,7 @@ describe('M6 skills-browser: boundary with maestro-skills — does not alter dis
   })
 
   it('listing maestro-skills checkout yields expected skills without affecting provider', async () => {
-    const maestroDir = '/home/kai/Work/htdocs/maestro-harness/maestro-skills/skills'
+    const maestroDir = join(process.cwd(), '../maestro-skills/skills')
     if (!existsSync(maestroDir)) {
       // if not present in CI, skip assertion but still pass
       expect(true).toBe(true)
@@ -155,7 +155,7 @@ describe('M6 skills-browser: boundary with maestro-skills — does not alter dis
 
 describe('M6 skills-browser: model suggestions cannot change skills', () => {
   it('memory_suggest valid targets exclude skills', async () => {
-    const hostText = readFileSync(join('/home/kai/Work/htdocs/maestro-harness/dsh-maestro-memory/src/host/index.ts'), 'utf8')
+    const hostText = readFileSync(join(process.cwd(), 'src/host/index.ts'), 'utf8')
     // extract the valid targets array from memory_suggest tool
     const match = hostText.match(/memory_suggest[\s\S]{0,500}enum:\s*\[([^\]]+)\]/)
     expect(match).not.toBeNull()
@@ -185,7 +185,7 @@ describe('M6 skills-browser: model suggestions cannot change skills', () => {
   })
 
   it('browser cannot be driven by model tool — only explicit user RPC', async () => {
-    const hostText = readFileSync(join('/home/kai/Work/htdocs/maestro-harness/dsh-maestro-memory/src/host/index.ts'), 'utf8')
+    const hostText = readFileSync(join(process.cwd(), 'src/host/index.ts'), 'utf8')
     // skills.list is via ctx.connection.rpc.handle, not via ctx.tools.register
     expect(hostText).toMatch(/skills\.list/)
     // ensure no tool named skill_manage or skill_browser is registered for model
@@ -235,7 +235,7 @@ describe('M6 skills-browser: path containment helpers for future mutation (read-
   })
 
   it('documents that mutation requires explicit user action and containment check (no auto-write)', async () => {
-    const src = readFileSync(join('/home/kai/Work/htdocs/maestro-harness/dsh-maestro-memory/src/host/skills-browser.ts'), 'utf8')
+    const src = readFileSync(join(process.cwd(), 'src/host/skills-browser.ts'), 'utf8')
     // must contain comment documenting future mutation guard
     expect(src).toMatch(/explicit user action/i)
     expect(src).toMatch(/containment|isPathContained/)
