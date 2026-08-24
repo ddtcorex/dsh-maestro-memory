@@ -8,7 +8,7 @@ Durable, user-governed memory and todos for DeepSeek Harness (DSH) that preserve
 
 - **Package:** `@ddtcorex/dsh-maestro-memory` (`cordis.patch.yml` id `maestro-memory`)
 - **Changelog:** `CHANGELOG.md`
-- **Version:** `1.0.0`
+- **Version:** `1.0.1`
 
 ---
 
