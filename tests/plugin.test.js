@@ -341,7 +341,9 @@ test('review status tool counts message turns and stays due until complete', asy
   const tool = ctx.state.tools.find((t) => t.name === 'memory_review_status')
   assert.ok(tool, 'review status tool registered when review enabled')
   assert.ok(ctx.state.tools.some((t) => t.name === 'memory_suggest'), 'suggest tool registered when review enabled')
-  const settled = ctx.state.listeners['agent/settled'][0]
+  // issue #24 修复后：DSH 核心不发 agent/settled，回合正常结束只发
+  // agent/turn-stopping（payload={agent, turn, signal}），监听器随 PR #25 切换事件名
+  const settled = ctx.state.listeners['agent/turn-stopping'][0]
   const agent = (id, turns) => ({
     id,
     session: {
@@ -357,7 +359,7 @@ test('review status tool counts message turns and stays due until complete', asy
   const exec = (id) => ({ agent: { id }, callId: 'c1', signal: new AbortController().signal })
 
   // turn 1: count 1, below the interval → not due
-  settled(agent('s1', [1]), 1, { kind: 'completed' })
+  settled({ agent: agent('s1', [1]), turn: 1 })
   let check = await tool.execute({ action: 'check' }, exec('s1'))
   assert.equal(check.due, false)
   assert.equal(check.turnsSinceReview, 1)
@@ -365,13 +367,13 @@ test('review status tool counts message turns and stays due until complete', asy
   assert.equal(check.mode, 'suggest')
 
   // turn 2: count 2 → due
-  settled(agent('s1', [1, 2]), 2, { kind: 'completed' })
+  settled({ agent: agent('s1', [1, 2]), turn: 2 })
   check = await tool.execute({ action: 'check' }, exec('s1'))
   assert.equal(check.due, true)
 
   // Due is sticky: another turn without complete keeps it due — a missed or
   // interrupted review is never silently dropped.
-  settled(agent('s1', [1, 2, 3]), 3, { kind: 'completed' })
+  settled({ agent: agent('s1', [1, 2, 3]), turn: 3 })
   check = await tool.execute({ action: 'check' }, exec('s1'))
   assert.equal(check.due, true)
   assert.equal(check.turnsSinceReview, 3)
@@ -384,7 +386,7 @@ test('review status tool counts message turns and stays due until complete', asy
   assert.equal(check.turnsSinceReview, 0)
 
   // complete before due does NOT reset — due=false must not silently delay the review
-  settled(agent('s3', [1]), 1, { kind: 'completed' })
+  settled({ agent: agent('s3', [1]), turn: 1 })
   const premature = await tool.execute({ action: 'complete' }, exec('s3'))
   assert.equal(premature.ok, true)
   assert.ok(premature.message.includes('未到期'))
@@ -393,9 +395,9 @@ test('review status tool counts message turns and stays due until complete', asy
 
   // non-message turns and subagent origins never count
   const retryAgent = { id: 's2', session: { header: { origin: undefined }, events: [{ type: 'turn/start', data: { turn: 1, trigger: { kind: 'retry' } } }] } }
-  settled(retryAgent, 1, { kind: 'completed' })
+  settled({ agent: retryAgent, turn: 1 })
   const childAgent = { id: 'child', session: { header: { origin: 'subagent' }, events: [{ type: 'turn/start', data: { turn: 1, trigger: { kind: 'message' } } }] } }
-  settled(childAgent, 1, { kind: 'completed' })
+  settled({ agent: childAgent, turn: 1 })
   check = await tool.execute({ action: 'check' }, exec('s2'))
   assert.equal(check.turnsSinceReview, 0)
   check = await tool.execute({ action: 'check' }, exec('child'))
@@ -904,4 +906,51 @@ test('de_prompts tool: promptsEnabled 开关注册/注销，list/get/inject 与�
   assert.ok(ctx2.state.tools.some((t) => t.name === 'my_prompts'))
   assert.ok(!ctx2.state.tools.some((t) => t.name === 'de_prompts'))
   clean(dir2)
+})
+
+test('systemPrompt context duplicate registration is tolerated (issue #23 idempotent guard)', async () => {
+  // 模拟宿主重复装配（DSH 0.1.x loader 曾把插件在无 scope 标签的 ctx 上
+  // apply 两次）：systemPrompt.context 第二次插入同名时抛 exactly
+  // dsh-system-prompt 的 global 层 duplicate 错误。修复前 apply 会整体抛错，
+  // 连带快照注入失效 + /memory-evolve/api/* 404。
+  const duplicateMessage = 'prompt context "memory:snapshot" is already registered (for a per-agent override, register through that agent\'s `agent.ctx` instead)'
+
+  // 场景 1：memory:snapshot 重复 → apply 不抛错，其余装配照常
+  const dir = tempDir()
+  const ctx = fakeCtx({
+    services: {
+      systemPrompt: {
+        context: () => { throw new Error(duplicateMessage) },
+      },
+    },
+  })
+  apply(ctx, { memoryDir: dir })
+  assert.ok(ctx.state.tools.some((t) => t.name === 'memory'), 'memory tool still registered after duplicate guard')
+  assert.ok(ctx.state.tools.some((t) => t.name === 'skill_manage'), 'skill tool still registered after duplicate guard')
+  clean(dir)
+
+  // 场景 2：prompt:injections 重复（prompts 模块开启时同款保护）
+  const dir2 = tempDir()
+  const ctx2 = fakeCtx({
+    services: {
+      systemPrompt: {
+        context: () => { throw new Error('prompt context "prompt:injections" is already registered in this scope') },
+      },
+    },
+  })
+  apply(ctx2, { memoryDir: dir2, promptsEnabled: true })
+  assert.ok(ctx2.state.tools.some((t) => t.name === 'de_prompts'), 'prompts tool still registered after duplicate guard')
+  clean(dir2)
+
+  // 场景 3：非 duplicate 的系统性错误必须照抛（保护只吞 "already registered"）
+  const dir3 = tempDir()
+  const ctx3 = fakeCtx({
+    services: {
+      systemPrompt: {
+        context: () => { throw new Error('systemPrompt exploded for another reason') },
+      },
+    },
+  })
+  assert.throws(() => apply(ctx3, { memoryDir: dir3 }), /systemPrompt exploded for another reason/)
+  clean(dir3)
 })
