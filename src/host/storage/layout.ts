@@ -41,10 +41,18 @@ export function suggestionsPath(root: string): string {
 export function dailyDir(root: string): string {
   return join(root, 'daily')
 }
+/** Reject non-YYYY-MM-DD values before they are interpolated into a path (path-traversal guard). */
+function assertDate(date: string): void {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    throw new Error(`invalid date "${date}" (expected YYYY-MM-DD)`)
+  }
+}
 export function dailyPath(root: string, date: string): string {
+  assertDate(date)
   return join(root, 'daily', `${date}.md`)
 }
 export function dailyTodoPath(root: string, date: string): string {
+  assertDate(date)
   return join(root, 'daily', `${date}.todo.md`)
 }
 export function projectDir(root: string, cwd: string): string {

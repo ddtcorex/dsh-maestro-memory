@@ -166,6 +166,15 @@ describe('M3-PR-A todo four tracks + IDs', () => {
     expect(all.truncated).toBe(false)
   })
 
+  it('cat filter disables the default smart view so matching non-smart-view todos are shown', () => {
+    const s = new TodoStore(root)
+    // A low-priority chore that the smart view would exclude (no due, q3-ish).
+    s.addTodo('work', 'low priority chore', { cat: 'chore', quadrant: 'q3' }, undefined)
+    const byCat = s.listTodos(['work'], { cat: 'chore' }, cwd)
+    expect(byCat.defaultView).toBe(false)
+    expect(byCat.items.map((i) => i.text)).toContain('low priority chore')
+  })
+
   it('historical daily lookup past/expired', () => {
     const s = new TodoStore(root)
     const today = todayStr()
