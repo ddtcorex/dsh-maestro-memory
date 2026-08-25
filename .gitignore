@@ -4,3 +4,7 @@ docs-local/
 node_modules/
 .worktrees/
 lib.bak-0812/
+
+# Superpowers specs/plans are committed design records in this repo.
+# Negation overrides the machine-global ~/.config/git/ignore entry.
+!docs/superpowers
