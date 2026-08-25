@@ -5,6 +5,10 @@ node_modules/
 .worktrees/
 lib.bak-0812/
 
+# Re-include coordination files ignored by the global core.excludesFile
+!AGENTS.md
+!CLAUDE.md
+
 # Superpowers specs/plans are committed design records in this repo.
 # Negation overrides the machine-global ~/.config/git/ignore entry.
 !docs/superpowers
