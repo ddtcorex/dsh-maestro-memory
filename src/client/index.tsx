@@ -73,6 +73,15 @@ const MEM_CSS = `
 .dshmem .cwd { box-sizing: border-box; height: 28px; flex: 1; min-width: 180px; font: 12px system-ui, sans-serif; padding: 0 10px; }
 .dshmem .cwd:disabled { opacity: .5; cursor: not-allowed; }
 .dshmem .cwd:disabled::placeholder { color: var(--dsw-alias-label-secondary); }
+.dshmem .tabbadge { display: inline-flex; align-items: center; justify-content: center; min-width: 16px; height: 16px; padding: 0 5px; margin-left: 6px; border-radius: 999px; background: var(--dsw-alias-state-error-primary, #d9534f); color: #fff; font-size: 11px; font-weight: 700; line-height: 1; vertical-align: middle; }
+`
+
+// Global CSS for the top-level header tab badge (injected into <head> by the
+// boot-time effect). Reuses DSH theme tokens so it flips with light/dark; a
+// soft blink draws attention to pending reviews without being obnoxious.
+const HEADER_BADGE_CSS = `
+.dshmem-header-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 16px; height: 16px; padding: 0 5px; margin-left: 6px; border-radius: 999px; background: var(--dsw-alias-state-error-primary, #d9534f); color: #fff; font-size: 11px; font-weight: 700; line-height: 1; vertical-align: middle; animation: dshmem-blink 1.2s ease-in-out infinite; }
+@keyframes dshmem-blink { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
 `
 
 // Best-effort current-session cwd, derived from the injected `sessions` feed
@@ -106,7 +115,7 @@ function useRpc(ctx: any) {
   )
 }
 
-function ReviewQueueView({ ctx }: { ctx: any }): React.ReactElement {
+function ReviewQueueView({ ctx, onPendingChange }: { ctx: any; onPendingChange?: (n: number) => void }): React.ReactElement {
   const rpc = useRpc(ctx)
   const [entries, setEntries] = React.useState<any[]>([])
   const [loading, setLoading] = React.useState(true)
@@ -117,13 +126,15 @@ function ReviewQueueView({ ctx }: { ctx: any }): React.ReactElement {
     setLoading(true)
     try {
       const res: any = await rpc('queue.list', {})
-      setEntries(Array.isArray(res?.entries) ? res.entries : [])
+      const list = Array.isArray(res?.entries) ? res.entries : []
+      setEntries(list)
+      onPendingChange?.(list.length)
     } catch (e: any) {
       setMsg(`load failed: ${e?.message ?? String(e)}`)
     } finally {
       setLoading(false)
     }
-  }, [rpc])
+  }, [rpc, onPendingChange])
 
   React.useEffect(() => {
     load()
@@ -817,7 +828,23 @@ function MemoryListView({ ctx }: { ctx: any }): React.ReactElement {
 }
 
 function MemoryView({ ctx }: { ctx: any }): React.ReactElement {
+  const rpc = useRpc(ctx)
   const [tab, setTab] = React.useState<'memory' | 'review' | 'todos' | 'skills'>('memory')
+  const [pending, setPending] = React.useState(0)
+
+  const refreshPending = React.useCallback(async () => {
+    try {
+      const res: any = await rpc('status', {})
+      setPending(typeof res?.queue === 'number' ? res.queue : 0)
+    } catch {
+      setPending(0)
+    }
+  }, [rpc])
+
+  React.useEffect(() => {
+    refreshPending()
+  }, [refreshPending, tab])
+
   return React.createElement(
     'div',
     { className: 'dshmem', style: { padding: 16, color: STYLE.text, display: 'flex', flexDirection: 'column' } },
@@ -837,13 +864,16 @@ function MemoryView({ ctx }: { ctx: any }): React.ReactElement {
             'data-testid': `tab-${k}`,
           },
           k,
+          k === 'review' && pending > 0
+            ? React.createElement('span', { className: 'tabbadge', 'data-testid': 'tab-badge-review' }, String(pending))
+            : null,
         ),
       ),
     ),
     tab === 'memory'
       ? React.createElement(MemoryListView, { ctx })
       : tab === 'review'
-        ? React.createElement(ReviewQueueView, { ctx })
+        ? React.createElement(ReviewQueueView, { ctx, onPendingChange: setPending })
         : tab === 'todos'
           ? React.createElement(TodosView, { ctx })
           : React.createElement(SkillsView, { ctx }),
@@ -867,4 +897,95 @@ export function apply(ctx: any): void {
       if (typeof dispose === 'function') dispose()
     }
   }, 'maestro-memory: view')
+
+  // Top-level header tab badge: pending-suggestion count, with a soft blink,
+  // injected into the DSH shell header tab labeled "Memory". DSH projects
+  // 'conversation.view' tabs as plain string labels (ViewTab.label), so there is
+  // no React slot to render into — the plugin reaches the shell DOM directly
+  // (same technique as the mobile nav plugin).
+  ctx.effect(() => {
+    const conn = (ctx as any).connection ?? (ctx as any).get?.('connection')
+    if (!conn?.rpc?.call) return () => {}
+    const BADGE_ATTR = 'data-dshmem-header-badge'
+    const VIEW_ATTR = 'data-dshmem-memory-tab'
+
+    const findMemoryTab = (): HTMLElement | null => {
+      const tabs = document.querySelectorAll('button[role="tab"]')
+      for (const tab of Array.from(tabs)) {
+        if (tab.getAttribute(VIEW_ATTR) === '1') return tab as HTMLElement
+      }
+      for (const tab of Array.from(tabs)) {
+        if (tab.closest('.dshmem')) continue
+        if ((tab.textContent ?? '').trim() === 'Memory') {
+          tab.setAttribute(VIEW_ATTR, '1')
+          return tab as HTMLElement
+        }
+      }
+      return null
+    }
+
+    const renderBadge = (count: number): void => {
+      const tab = findMemoryTab()
+      if (!tab) return
+      const existing = tab.querySelector(`[${BADGE_ATTR}]`)
+      if (count <= 0) {
+        if (existing) existing.remove()
+        return
+      }
+      if (existing && existing.textContent === String(count)) return
+      if (existing) existing.remove()
+      const badge = document.createElement('span')
+      badge.setAttribute(BADGE_ATTR, '')
+      badge.className = 'dshmem-header-badge'
+      badge.textContent = String(count)
+      tab.appendChild(badge)
+    }
+
+    let styleEl = document.getElementById('dshmem-header-style') as HTMLStyleElement | null
+    if (!styleEl) {
+      styleEl = document.createElement('style')
+      styleEl.id = 'dshmem-header-style'
+      styleEl.textContent = HEADER_BADGE_CSS
+      document.head.appendChild(styleEl)
+    }
+
+    let disposed = false
+    let lastCount = 0
+    const refresh = async (): Promise<void> => {
+      if (disposed) return
+      try {
+        const result: any = await conn.rpc.call(RPC_CHANNEL, 'status', {})
+        const value = result?.ok === true ? result.value : null
+        lastCount = typeof value?.queue === 'number' ? value.queue : 0
+        renderBadge(lastCount)
+      } catch {
+        lastCount = 0
+        renderBadge(0)
+      }
+    }
+
+    void refresh()
+    const timer = window.setInterval(() => {
+      void refresh()
+    }, 8000)
+
+    const observer = new MutationObserver(() => {
+      if (disposed) return
+      const tab = findMemoryTab()
+      if (!tab) return
+      const hasBadge = tab.querySelector(`[${BADGE_ATTR}]`)
+      if (lastCount > 0 && !hasBadge) renderBadge(lastCount)
+      else if (lastCount <= 0 && hasBadge) renderBadge(0)
+    })
+    observer.observe(document.body, { childList: true, subtree: true })
+
+    return () => {
+      disposed = true
+      window.clearInterval(timer)
+      observer.disconnect()
+      styleEl?.remove()
+      const tab = findMemoryTab()
+      if (tab) tab.querySelector(`[${BADGE_ATTR}]`)?.remove()
+    }
+  }, 'maestro-memory: header-badge')
 }
