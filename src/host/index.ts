@@ -4,6 +4,7 @@
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { MaestroMemoryStore } from './memory/store.ts'
 import { applyBatch } from './memory/batch.ts'
+import { buildFeedbackLine } from './memory/feedback.ts'
 import { TodoStore, resolveQuadrant, DEFAULT_VIEW_LIMIT } from './todo/store.ts'
 import { TODO_TARGETS, TODO_STATUSES } from './storage/legacy-format.ts'
 import { SuggestionQueue, enqueueSuggestion, approveSuggestions, rejectSuggestions } from './review/queue.ts'
@@ -87,6 +88,10 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
         branch: { type: 'string', description: 'Branch filter for key (list)' },
         branches: { type: 'string', description: 'Branch scope csv for key add, e.g. main,dev (empty=all)' },
         summary: { type: 'string', description: 'One-line summary for key add (progressive disclosure)' },
+        sentiment: { type: 'string', enum: ['positive', 'negative', 'neutral'], description: 'Attach [Feedback] line on add when set (single add or entries[])' },
+        category: { type: 'string', description: 'Feedback category (requires sentiment)' },
+        quote: { type: 'string', description: 'Feedback quote (requires sentiment)' },
+        note: { type: 'string', description: 'Feedback note (requires sentiment)' },
         id: { type: 'string', description: 'Entry id for expand (key)' },
         archived: { type: 'boolean', description: 'Query archive files (list)' },
         cwd: { type: 'string', description: 'Working directory for project/key tracks' },
@@ -112,7 +117,16 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
               } else if (!target) {
                 return { content: [{ type: 'text', text: 'add failed: target is required for single add (or pass entries[])' }] }
               }
-              const res = store.add(target, args.content ?? '', cwd, {
+              let entryText = args.content ?? ''
+              if (args.sentiment !== undefined) {
+                entryText = `${entryText.trimEnd()} ${buildFeedbackLine({
+                  sentiment: args.sentiment,
+                  category: args.category,
+                  quote: args.quote,
+                  note: args.note,
+                })}`
+              }
+              const res = store.add(target, entryText, cwd, {
                 branches: args.branches,
                 summary: args.summary,
                 // daily add targets a specific day when the caller passes date

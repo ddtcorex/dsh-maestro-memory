@@ -1,4 +1,5 @@
 import type { MaestroMemoryStore, MemoryTarget } from './store.ts'
+import { buildFeedbackLine, type FeedbackSentiment } from './feedback.ts'
 
 /** Targets accepted by MaestroMemoryStore ('global' is a normalized alias of 'memory'). */
 const VALID_TARGETS = new Set<string>(['memory', 'global', 'user', 'project', 'key', 'daily'])
@@ -14,6 +15,11 @@ export interface BatchEntryInput {
   branches?: string
   /** One-line summary for key add (progressive disclosure). */
   summary?: string
+  /** When set, appends the end-of-turn `[Feedback]` line to the stored content. */
+  sentiment?: FeedbackSentiment
+  category?: string
+  quote?: string
+  note?: string
 }
 
 export type BatchResult =
@@ -48,7 +54,20 @@ export function applyBatch(
     if (!VALID_TARGETS.has(target)) {
       return fail(store, added, i, `unknown target '${target}'`)
     }
-    const res = store.add(target as MemoryTarget, e.content ?? '', e.cwd, {
+    let content = e.content ?? ''
+    if (e.sentiment !== undefined) {
+      try {
+        content = `${content.trimEnd()} ${buildFeedbackLine({
+          sentiment: e.sentiment,
+          category: e.category,
+          quote: e.quote,
+          note: e.note,
+        })}`
+      } catch (err: any) {
+        return fail(store, added, i, err?.message ?? String(err))
+      }
+    }
+    const res = store.add(target as MemoryTarget, content, e.cwd, {
       branches: e.branches,
       summary: e.summary,
       date: e.date,
@@ -62,8 +81,8 @@ export function applyBatch(
       added.push({
         target: target as MemoryTarget,
         // key entries carry a generated id token; other tracks are stored
-        // verbatim, so the trimmed content is the precise removal token.
-        token: res.id !== undefined ? `[id:${res.id}]` : String(e.content ?? '').trim(),
+        // verbatim, so the trimmed stored content is the precise removal token.
+        token: res.id !== undefined ? `[id:${res.id}]` : content.trim(),
         cwd: e.cwd,
         date: e.date,
       })
