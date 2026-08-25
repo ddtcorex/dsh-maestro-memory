@@ -57,4 +57,12 @@ describe('renderSnapshot contract', () => {
     expect(text).toContain('global')
     expect(text).not.toContain('Project Key')
   })
+
+  it('integration: systemPrompt context text delegates to renderSnapshot', async () => {
+    const { readFileSync } = await import('node:fs')
+    const src = readFileSync(new URL('../src/host/index.ts', import.meta.url), 'utf8')
+    expect(src).toContain('renderSnapshot')
+    expect(src).toContain("name: 'memory:snapshot'")
+    expect(src).toContain('order')
+  })
 })
