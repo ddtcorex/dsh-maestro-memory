@@ -3,6 +3,8 @@
  */
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { MaestroMemoryStore } from './memory/store.ts'
+import { applyBatch } from './memory/batch.ts'
+import { buildFeedbackLine } from './memory/feedback.ts'
 import { TodoStore, resolveQuadrant, DEFAULT_VIEW_LIMIT } from './todo/store.ts'
 import { TODO_TARGETS, TODO_STATUSES } from './storage/legacy-format.ts'
 import { SuggestionQueue, enqueueSuggestion, approveSuggestions, rejectSuggestions } from './review/queue.ts'
@@ -12,6 +14,7 @@ import * as migration from './migration/service.ts'
 import { SyncService } from './sync/service.ts'
 import { RealGitAdapter } from './sync/git.ts'
 import { listSkillsSync, resolveDefaultMaestroSkillsDir } from './skills-browser.ts'
+import { renderSnapshot } from './prompt/snapshot.ts'
 
 export const inject = ['tools', 'systemPrompt', 'connection'] as const
 
@@ -53,7 +56,13 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
       text: (promptCtx: any) => {
         const cwd: string | null = promptCtx?.agent?.session?.header?.cwd ?? null
         const branch: string | undefined = promptCtx?.agent?.session?.header?.branch ?? undefined
-        return store.snapshot(cwd, branch ? { branch } : {})
+        const sessionId: string | undefined = promptCtx?.agent?.session?.header?.sessionId
+          ?? promptCtx?.agent?.session?.id
+          ?? undefined
+        const sessionName: string | undefined = promptCtx?.agent?.session?.header?.sessionName
+          ?? promptCtx?.agent?.session?.name
+          ?? undefined
+        return renderSnapshot(store, { cwd, branch, sessionId, sessionName })
       },
     })
     return () => {
@@ -67,7 +76,8 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
       description: 'Maestro memory (M2: five tracks, query, replace/remove, archive, branch, summary/expand)',
       parameters: {
         action: { type: 'string', required: true, enum: ['add', 'list', 'replace', 'remove', 'archive', 'expand'], description: 'Memory action' },
-        target: { type: 'string', required: true, enum: ['memory', 'user', 'project', 'key', 'daily'], description: 'Memory track (daily=YYYY-MM-DD file, project=per-cwd log, key=per-cwd long-term)' },
+        target: { type: 'string', description: 'Memory track (daily=YYYY-MM-DD file, project=per-cwd log, key=per-cwd long-term); optional only when entries[] is used' },
+        entries: { type: 'array', description: 'Batch add: array of {target,content,cwd?,date?,branches?,summary?} — sequential through store.add with rollback on first failure' },
         content: { type: 'string', description: 'Entry content (add) or new content (replace)' },
         match: { type: 'string', description: 'Unique substring identifying entry (replace/remove/archive)' },
         filter: { type: 'string', description: 'Content substring filter (list)' },
@@ -78,6 +88,10 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
         branch: { type: 'string', description: 'Branch filter for key (list)' },
         branches: { type: 'string', description: 'Branch scope csv for key add, e.g. main,dev (empty=all)' },
         summary: { type: 'string', description: 'One-line summary for key add (progressive disclosure)' },
+        sentiment: { type: 'string', enum: ['positive', 'negative', 'neutral'], description: 'Attach [Feedback] line on add when set (single add or entries[])' },
+        category: { type: 'string', description: 'Feedback category (requires sentiment)' },
+        quote: { type: 'string', description: 'Feedback quote (requires sentiment)' },
+        note: { type: 'string', description: 'Feedback note (requires sentiment)' },
         id: { type: 'string', description: 'Entry id for expand (key)' },
         archived: { type: 'boolean', description: 'Query archive files (list)' },
         cwd: { type: 'string', description: 'Working directory for project/key tracks' },
@@ -91,7 +105,28 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
         try {
           switch (action) {
             case 'add': {
-              const res = store.add(target, args.content ?? '', cwd, {
+              // Batch path: entries[] takes precedence over the single target/content form.
+              if (Array.isArray(args.entries)) {
+                if (!args.target && !args.content) {
+                  const batchRes = applyBatch(store, args.entries)
+                  if (!batchRes.ok) {
+                    return { content: [{ type: 'text', text: `batch failed at [${batchRes.index}]: ${batchRes.error}` }] }
+                  }
+                  return { content: [{ type: 'text', text: `added ${batchRes.ids.length} ${batchRes.ids.length === 1 ? 'entry' : 'entries'} (batch)` }] }
+                }
+              } else if (!target) {
+                return { content: [{ type: 'text', text: 'add failed: target is required for single add (or pass entries[])' }] }
+              }
+              let entryText = args.content ?? ''
+              if (args.sentiment !== undefined) {
+                entryText = `${entryText.trimEnd()} ${buildFeedbackLine({
+                  sentiment: args.sentiment,
+                  category: args.category,
+                  quote: args.quote,
+                  note: args.note,
+                })}`
+              }
+              const res = store.add(target, entryText, cwd, {
                 branches: args.branches,
                 summary: args.summary,
                 // daily add targets a specific day when the caller passes date

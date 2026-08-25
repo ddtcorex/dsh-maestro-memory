@@ -120,6 +120,15 @@ export function parseEntrySummary(entry: string): string | null {
 }
 
 /**
+ * Return the program-metadata prefix ([id]/timestamp/[git]/[branch]/[dsh-only]) of an entry.
+ * Useful for compact renderings that keep the header and drop the body.
+ */
+export function entryHeadPrefix(entry: string): string {
+  const match = ENTRY_HEAD_RE.exec(String(entry ?? ''))
+  return match === null ? '' : match[0]
+}
+
+/**
  * Strip the "summary" marker for display (only at header position).
  */
 export function stripEntrySummary(entry: string): string {

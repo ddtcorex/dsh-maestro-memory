@@ -171,11 +171,13 @@ Dedupes by `(target, content)` within the queue (bumps `hits`), appends to `SUGG
 
 Registered as `ctx.systemPrompt.context({ name: 'memory:snapshot', order: 500, text: (ctx) => renderSnapshot(cwd, branch) })`.
 
-Injected text is **bounded** and deterministic: `USER + global MEMORY + current-project KEY` (branch-filtered if `session.header.branch` is present), plus a header with `sessionId`/`sessionName` and an end-of-turn discipline note:
+Injected text is **bounded** and deterministic: `USER + global MEMORY + current-project KEY` (branch-filtered if `session.header.branch` is present), plus a header with `sessionId`/`sessionName` and an end-of-turn discipline note (rendered verbatim as `---` + newline + sentence):
 
-> End of every turn ... you must: 1. Write `daily+project` via `memory` entries (daily+project in one call) 2. Check `dtodo list` (bounded, max 8)
+> End of every turn you must: 1. Write daily+project via memory entries (daily+project in one call) 2. Check dtodo list (bounded, max 8)
 
 `daily` and `project log` (`projects/<hash>/MEMORY.md`) are queryable via `memory` but **not injected**, to keep prompt cost predictable. New `prompt/snapshot.ts` must reproduce this contract or agents silently stop writing logs.
+
+Each injected section also enforces a **per-track byte cap** — defaults `SNAPSHOT_SECTION_CAPS = { memory: 2048, user: 4096, key: 6144 }`, overridable per call via `renderSnapshot(store, ctx, { caps })`. Entries are kept newest-first; the oldest overflow is dropped. The newest entry is always kept: if it alone exceeds the cap **and** carries an `[summary:…]` header tag (parsed by `ENTRY_HEAD_RE`), it renders compacted to `head + [summary:…]`; untagged oversize entries stay whole rather than vanishing.
 
 ---
 
