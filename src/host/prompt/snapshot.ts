@@ -37,10 +37,13 @@ export function renderSnapshot(
   if (user.length) parts.push(`# User Memory\n${user.join('\n---\n')}`)
   if (key.length) parts.push(`# Project Key Memory\n${key.join('\n---\n')}`)
 
-  // End-of-turn discipline note — verbatim contract
-  parts.push(
-    `---\nEnd of every turn you must: 1. Write daily+project via memory entries (daily+project in one call) 2. Check dtodo list (bounded, max 8)`,
-  )
+  // End-of-turn discipline note — verbatim contract (hardened: exactly once, always last)
+  const discipline =
+    `---\nEnd of every turn you must: 1. Write daily+project via memory entries (daily+project in one call) 2. Check dtodo list (bounded, max 8)`
+  // Defensive: strip any pre-existing discipline entry (should never occur — parts is fresh per call)
+  // then append exactly once so the note is guaranteed last even for empty stores or repeated calls.
+  const deduped = parts.filter((p) => p !== discipline)
+  deduped.push(discipline)
 
-  return parts.join('\n\n')
+  return deduped.join('\n\n')
 }

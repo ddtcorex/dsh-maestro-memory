@@ -58,6 +58,26 @@ describe('renderSnapshot contract', () => {
     expect(text).not.toContain('Project Key')
   })
 
+  it('empty store still emits discipline note (never empty prompt)', () => {
+    const text = renderSnapshot(store, { cwd: null })
+    expect(text).toMatch(/End of every turn/i)
+  })
+
+  it('does not duplicate discipline note on repeated calls', () => {
+    const a = renderSnapshot(store, { cwd })
+    const b = renderSnapshot(store, { cwd })
+    expect((a.match(/End of every turn/g) || []).length).toBe(1)
+    expect((b.match(/End of every turn/g) || []).length).toBe(1)
+  })
+
+  it('branch undefined does not filter out any key entries', () => {
+    store.add('key', '[2026-08-10] all', cwd)
+    store.add('key', '[2026-08-10] main only', cwd, { branches: 'main' })
+    const text = renderSnapshot(store, { cwd }) // no branch
+    expect(text).toContain('all')
+    expect(text).toContain('main only') // no filter => all visible
+  })
+
   it('integration: systemPrompt context text delegates to renderSnapshot', async () => {
     const { readFileSync } = await import('node:fs')
     const src = readFileSync(new URL('../src/host/index.ts', import.meta.url), 'utf8')
