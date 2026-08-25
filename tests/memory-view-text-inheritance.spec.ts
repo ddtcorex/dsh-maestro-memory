@@ -14,12 +14,15 @@ const client = readFileSync(
 )
 
 describe('memory view inherits DSH text styles', () => {
-  it('the .dshmem container sets no own typography', () => {
+  it('the .dshmem container sets the view font size once for every child', () => {
     const css = client.match(/const MEM_CSS = `([\s\S]*?)`/)?.[1] ?? ''
     expect(css).toContain('.dshmem {')
-    // the container rule must not carry font-family/font-size/line-height
+    // single source of typography: the container carries the 13px body size;
+    // family stays inherited from the DSH tree. Children resolve through
+    // normal inheritance.
     const rootRule = css.match(/\.dshmem \{[^}]*\}/)?.[0] ?? ''
-    expect(rootRule).not.toMatch(/font-family|font:|font-size|line-height/)
+    expect(rootRule).toMatch(/font-size:\s*13px/)
+    expect(rootRule).not.toMatch(/font-family|line-height/)
   })
 
   it('no scoped rule or inline style stamps a hard font size', () => {
