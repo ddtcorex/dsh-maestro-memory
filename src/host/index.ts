@@ -3,6 +3,7 @@
  */
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { MaestroMemoryStore } from './memory/store.ts'
+import { applyBatch } from './memory/batch.ts'
 import { TodoStore, resolveQuadrant, DEFAULT_VIEW_LIMIT } from './todo/store.ts'
 import { TODO_TARGETS, TODO_STATUSES } from './storage/legacy-format.ts'
 import { SuggestionQueue, enqueueSuggestion, approveSuggestions, rejectSuggestions } from './review/queue.ts'
@@ -74,7 +75,8 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
       description: 'Maestro memory (M2: five tracks, query, replace/remove, archive, branch, summary/expand)',
       parameters: {
         action: { type: 'string', required: true, enum: ['add', 'list', 'replace', 'remove', 'archive', 'expand'], description: 'Memory action' },
-        target: { type: 'string', required: true, enum: ['memory', 'user', 'project', 'key', 'daily'], description: 'Memory track (daily=YYYY-MM-DD file, project=per-cwd log, key=per-cwd long-term)' },
+        target: { type: 'string', description: 'Memory track (daily=YYYY-MM-DD file, project=per-cwd log, key=per-cwd long-term); optional only when entries[] is used' },
+        entries: { type: 'array', description: 'Batch add: array of {target,content,cwd?,date?,branches?,summary?} — sequential through store.add with rollback on first failure' },
         content: { type: 'string', description: 'Entry content (add) or new content (replace)' },
         match: { type: 'string', description: 'Unique substring identifying entry (replace/remove/archive)' },
         filter: { type: 'string', description: 'Content substring filter (list)' },
@@ -98,6 +100,18 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
         try {
           switch (action) {
             case 'add': {
+              // Batch path: entries[] takes precedence over the single target/content form.
+              if (Array.isArray(args.entries)) {
+                if (!args.target && !args.content) {
+                  const batchRes = applyBatch(store, args.entries)
+                  if (!batchRes.ok) {
+                    return { content: [{ type: 'text', text: `batch failed at [${batchRes.index}]: ${batchRes.error}` }] }
+                  }
+                  return { content: [{ type: 'text', text: `added ${batchRes.ids.length} ${batchRes.ids.length === 1 ? 'entry' : 'entries'} (batch)` }] }
+                }
+              } else if (!target) {
+                return { content: [{ type: 'text', text: 'add failed: target is required for single add (or pass entries[])' }] }
+              }
               const res = store.add(target, args.content ?? '', cwd, {
                 branches: args.branches,
                 summary: args.summary,
