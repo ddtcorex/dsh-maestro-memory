@@ -12,6 +12,7 @@ import * as migration from './migration/service.ts'
 import { SyncService } from './sync/service.ts'
 import { RealGitAdapter } from './sync/git.ts'
 import { listSkillsSync, resolveDefaultMaestroSkillsDir } from './skills-browser.ts'
+import { renderSnapshot } from './prompt/snapshot.ts'
 
 export const inject = ['tools', 'systemPrompt', 'connection'] as const
 
@@ -53,7 +54,13 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
       text: (promptCtx: any) => {
         const cwd: string | null = promptCtx?.agent?.session?.header?.cwd ?? null
         const branch: string | undefined = promptCtx?.agent?.session?.header?.branch ?? undefined
-        return store.snapshot(cwd, branch ? { branch } : {})
+        const sessionId: string | undefined = promptCtx?.agent?.session?.header?.sessionId
+          ?? promptCtx?.agent?.session?.id
+          ?? undefined
+        const sessionName: string | undefined = promptCtx?.agent?.session?.header?.sessionName
+          ?? promptCtx?.agent?.session?.name
+          ?? undefined
+        return renderSnapshot(store, { cwd, branch, sessionId, sessionName })
       },
     })
     return () => {
