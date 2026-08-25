@@ -8,7 +8,7 @@ Durable memory + todos + bounded system-prompt snapshot plugin for the DeepSeek 
 
 Names by boundary: npm package = `@ddtcorex/dsh-maestro-memory`; Cordis patch row id = `maestro-memory`.
 
-Part of the Maestro Harness suite (installed as a DSH plugin). This package is a fork of `csyangwen/dsh-memory-evolve` (remote `upstream`).
+Part of the Maestro Harness suite (installed as a DSH plugin). Originally forked from `csyangwen/dsh-memory-evolve`; maintained standalone at `ddtcorex/dsh-maestro-memory` since 2026-08-26 (the `upstream` remote has been removed).
 
 ## Layout
 
@@ -43,7 +43,7 @@ pnpm build    # tsc host + client && node scripts/build-client.mjs  -> lib/
 - Default branch `master`. No direct commits to `master` — use `feat/<topic>` / `fix/<topic>` and a PR against `ddtcorex/dsh-maestro-memory`.
 - Conventional commits, imperative mood (`feat:`, `fix:`, `docs:`, `chore:`).
 - One TDD task = one commit; never commit while `pnpm verify` is red.
-- Rebase on `upstream/main` when the base moves; sync forks with `git fetch upstream` + rebase, not merge.
+- When the base moves, rebase the feature branch onto `origin/master` (single-origin workflow; there is no upstream remote).
 
 ## Conventions
 
