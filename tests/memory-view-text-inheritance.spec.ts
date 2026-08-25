@@ -35,10 +35,14 @@ describe('memory view inherits DSH text styles', () => {
     expect(inlineSizes.length).toBe(0)
   })
 
-  it('buttons and inputs inherit instead of declaring font shorthand', () => {
+  it('buttons and inputs opt into inheritance via font: inherit', () => {
+    // Form controls carry a UA-stylesheet font (Chrome: 13.33px Arial) and do
+    // NOT inherit by default — they must explicitly opt back into the host
+    // chain with font: inherit (still zero hard-coded px). Non-control
+    // classes (tab / pill / ghost / tracklabel / cwd) declare no font at all.
     const css = client.match(/const MEM_CSS = `([\s\S]*?)`/)?.[1] ?? ''
-    expect(css).not.toMatch(/\.dshmem button \{[^}]*font:/)
-    expect(css).not.toMatch(/input, \.dshmem textarea[^}]*font:/)
+    expect(css).toMatch(/\.dshmem button \{[^}]*font:\s*inherit/)
+    expect(css).toMatch(/\.dshmem input, \.dshmem textarea, \.dshmem select \{[^}]*font:\s*inherit/)
     expect(css).not.toMatch(/\.dshmem \.tab \{[^}]*font:/)
     expect(css).not.toMatch(/\.dshmem \.pill \{[^}]*font:/)
     expect(css).not.toMatch(/\.dshmem \.ghost \{[^}]*font:/)

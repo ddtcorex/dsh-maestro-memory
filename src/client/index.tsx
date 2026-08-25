@@ -46,11 +46,13 @@ const STYLE = {
 // per-element `font: 13px system-ui` stamps that fight the host theme.
 const MEM_CSS = `
 .dshmem { color: var(--dsw-alias-label-primary); }
-.dshmem button { cursor: pointer; transition: color .12s ease, background .12s ease, border-color .12s ease; }
+/* Form controls carry a UA-stylesheet font (13.33px Arial) and do not
+   inherit by default: opt them back into the host chain explicitly. */
+.dshmem button { font: inherit; cursor: pointer; transition: color .12s ease, background .12s ease, border-color .12s ease; }
 .dshmem button:hover { color: var(--dsw-alias-label-primary); }
 .dshmem button:active { transform: translateY(.5px); }
 .dshmem button:focus-visible { outline: 2px solid var(--dsw-alias-interactive-bg-active); outline-offset: 1px; }
-.dshmem input, .dshmem textarea, .dshmem select { color: var(--dsw-alias-label-primary); background: var(--dsw-alias-bg-layer-2); border: 1px solid var(--dsw-alias-border-l1); border-radius: 6px; padding: 5px 8px; }
+.dshmem input, .dshmem textarea, .dshmem select { font: inherit; color: var(--dsw-alias-label-primary); background: var(--dsw-alias-bg-layer-2); border: 1px solid var(--dsw-alias-border-l1); border-radius: 6px; padding: 5px 8px; }
 .dshmem input:focus, .dshmem textarea:focus, .dshmem select:focus { outline: none; border-color: var(--dsw-alias-border-l2); }
 .dshmem textarea { resize: vertical; }
 .dshmem .card { border: 1px solid var(--dsw-alias-border-l1); border-radius: 8px; padding: 10px; }
