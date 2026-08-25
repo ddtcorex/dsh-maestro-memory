@@ -1,10 +1,52 @@
+import { Buffer } from 'node:buffer'
 import type { MaestroMemoryStore } from '../memory/store.ts'
+import { entryHeadPrefix, parseEntrySummary } from '../storage/legacy-format.ts'
 
 export interface SnapshotContext {
   cwd: string | null
   branch?: string
   sessionId?: string
   sessionName?: string
+}
+
+/** Default per-section byte budgets for the snapshot prompt. */
+export const SNAPSHOT_SECTION_CAPS = { memory: 2048, user: 4096, key: 6144 } as const
+
+export type SnapshotSectionKey = keyof typeof SNAPSHOT_SECTION_CAPS
+
+export interface SnapshotRenderOpts {
+  /** Partial override of {@link SNAPSHOT_SECTION_CAPS}; unspecified sections keep defaults. */
+  caps?: Partial<Record<SnapshotSectionKey, number>>
+}
+
+const SECTION_SEP = '\n---\n'
+
+/** Compact an oversize entry to `head + [summary:…]` when it carries a summary tag; otherwise keep whole. */
+function compactToHead(entry: string): string {
+  const summary = parseEntrySummary(entry)
+  if (summary === null) return entry
+  return `${entryHeadPrefix(entry)}[summary:${summary}]`
+}
+
+/**
+ * Keep the newest entries whose combined UTF-8 size (with separators) fits `cap`.
+ * The newest entry is always kept — compacted to its summary head when oversized
+ * and tagged; untagged oversize entries stay whole rather than vanishing.
+ */
+function fitSection(entries: string[], cap: number): string[] {
+  if (entries.length === 0) return []
+  const keptDesc: string[] = []
+  let used = 0
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const isNewest = keptDesc.length === 0
+    let candidate = entries[i]
+    if (isNewest && Buffer.byteLength(candidate, 'utf8') > cap) candidate = compactToHead(candidate)
+    const cost = Buffer.byteLength(candidate, 'utf8') + (keptDesc.length ? SECTION_SEP.length : 0)
+    if (!isNewest && used + cost > cap) break
+    keptDesc.push(candidate)
+    used += cost
+  }
+  return keptDesc.reverse()
 }
 
 /**
@@ -16,7 +58,9 @@ export interface SnapshotContext {
 export function renderSnapshot(
   store: MaestroMemoryStore,
   ctx: SnapshotContext,
+  opts: SnapshotRenderOpts = {},
 ): string {
+  const caps = { ...SNAPSHOT_SECTION_CAPS, ...opts.caps }
   const parts: string[] = []
 
   // Header
@@ -28,10 +72,12 @@ export function renderSnapshot(
     if (header) parts.push(`# Session\n${header}`)
   }
 
-  // Bounded memory sections — delegate branch filtering to store.list
-  const mem = store.list('memory')
-  const user = store.list('user')
-  const key = ctx.cwd ? store.list('key', ctx.cwd, ctx.branch ? { branch: ctx.branch } : {}) : []
+  // Bounded memory sections — delegate branch filtering to store.list, then enforce byte caps
+  const mem = fitSection(store.list('memory'), caps.memory)
+  const user = fitSection(store.list('user'), caps.user)
+  const key = ctx.cwd
+    ? fitSection(store.list('key', ctx.cwd, ctx.branch ? { branch: ctx.branch } : {}), caps.key)
+    : []
 
   if (mem.length) parts.push(`# Global Memory\n${mem.join('\n---\n')}`)
   if (user.length) parts.push(`# User Memory\n${user.join('\n---\n')}`)

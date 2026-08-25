@@ -86,3 +86,52 @@ describe('renderSnapshot contract', () => {
     expect(src).toContain('order')
   })
 })
+
+describe('renderSnapshot per-track byte caps', () => {
+  it('drops oldest memory entries first until under cap, always keeping the newest', () => {
+    store.add('memory', '[2026-08-10] mem-oldest-AAA')
+    store.add('memory', '[2026-08-10] mem-mid-BBB')
+    store.add('memory', '[2026-08-10] mem-newest-CCC')
+    const text = renderSnapshot(store, { cwd }, { caps: { memory: 40 } })
+    expect(text).toContain('mem-newest-CCC')
+    expect(text).not.toContain('mem-mid-BBB')
+    expect(text).not.toContain('mem-oldest-AAA')
+  })
+
+  it('caps each section independently — other sections unaffected', () => {
+    store.add('user', '[2026-08-10] usr-old-111')
+    store.add('user', '[2026-08-10] usr-new-222')
+    store.add('key', '[2026-08-10] key-old-333', cwd)
+    store.add('key', '[2026-08-10] key-new-444', cwd)
+    const text = renderSnapshot(store, { cwd }, { caps: { user: 40 } })
+    expect(text).toContain('usr-new-222')
+    expect(text).not.toContain('usr-old-111')
+    expect(text).toContain('key-old-333') // default key cap leaves both
+    expect(text).toContain('key-new-444')
+  })
+
+  it('always keeps the newest entry even when it alone exceeds the cap', () => {
+    store.add('memory', '[2026-08-10] huge-single-DDD ' + 'x'.repeat(400))
+    const text = renderSnapshot(store, { cwd }, { caps: { memory: 50 } })
+    expect(text).toContain('huge-single-DDD')
+  })
+
+  it('oversize newest entry carrying [summary:] renders as its compact head only', () => {
+    store.add('key', '[2026-08-10] [summary:key-short-summary] ' + 'z'.repeat(600), cwd)
+    const text = renderSnapshot(store, { cwd }, { caps: { key: 80 } })
+    expect(text).toContain('[summary:key-short-summary]')
+    expect(text).not.toContain('zzzzzzzzzz')
+  })
+
+  it('caps override is partial — unspecified sections keep defaults', () => {
+    store.add('user', '[2026-08-10] usr-default-555')
+    store.add('user', '[2026-08-10] usr-default-666')
+    store.add('memory', '[2026-08-10] mem-old-777')
+    store.add('memory', '[2026-08-10] mem-new-888')
+    const text = renderSnapshot(store, { cwd }, { caps: { memory: 40 } })
+    expect(text).toContain('usr-default-555') // default user cap (4096) keeps both
+    expect(text).toContain('usr-default-666')
+    expect(text).not.toContain('mem-old-777')
+    expect(text).toContain('mem-new-888')
+  })
+})

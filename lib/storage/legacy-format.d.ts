@@ -48,6 +48,11 @@ export declare const SUMMARY_TAG_RE: RegExp;
  */
 export declare function parseEntrySummary(entry: string): string | null;
 /**
+ * Return the program-metadata prefix ([id]/timestamp/[git]/[branch]/[dsh-only]) of an entry.
+ * Useful for compact renderings that keep the header and drop the body.
+ */
+export declare function entryHeadPrefix(entry: string): string;
+/**
  * Strip the "summary" marker for display (only at header position).
  */
 export declare function stripEntrySummary(entry: string): string;
