@@ -46,9 +46,9 @@ The package is consumed as a DSH plugin via `cordis.patch.yml`. Two install path
 
 ```sh
 # inside the profile that will own the plugin:
-dsh plugin --profile web add link:/home/kai/Work/htdocs/maestro-harness/dsh-maestro-memory
+dsh plugin --profile web add link:<workspace-root>/packages/dsh-maestro-memory
 # or manually in ~/.dsh/profiles/web/package.json:
-# "@ddtcorex/dsh-maestro-memory": "link:/home/kai/Work/htdocs/maestro-harness/dsh-maestro-memory"
+# "@ddtcorex/dsh-maestro-memory": "link:<workspace-root>/packages/dsh-maestro-memory"
 ```
 
 **Git / registry (production after release):**
@@ -82,7 +82,7 @@ Profile `~/.dsh/profiles/web/package.json` after a correct install:
 {
   "dsh": { "profile": { "bundles": ["@ddtcorex/dsh-maestro-memory"] } },
   "dependencies": {
-    "@ddtcorex/dsh-maestro-memory": "link:/home/kai/Work/htdocs/maestro-harness/dsh-maestro-memory"
+    "@ddtcorex/dsh-maestro-memory": "link:<workspace-root>/packages/dsh-maestro-memory"
   }
 }
 ```
