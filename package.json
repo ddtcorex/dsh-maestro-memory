@@ -2,7 +2,6 @@
   "name": "@ddtcorex/dsh-maestro-memory",
   "version": "1.0.1",
   "description": "Durable layered memory (global / user / project / branch / daily), confirmation-gated writes, todos and skills. Preserves ~/.dsh/memories files in place with in-place adoption, SHA-256 verified backup and rollback.",
-  "private": true,
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",
