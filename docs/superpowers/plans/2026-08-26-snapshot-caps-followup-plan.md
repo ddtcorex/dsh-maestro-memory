@@ -6,8 +6,8 @@
 sections, atomic batch `memory add`, and `[Feedback]` line support. One PR, stacked on
 `feat/snapshot-discipline-trigger` (PR #9) because `src/host/prompt/snapshot.ts` lives there.
 
-**Worktree:** `/home/kai/Work/htdocs/maestro-harness-worktrees/dsh-maestro-memory-snapshot-caps`
-(branch `feat/snapshot-caps` → base `feat/snapshot-discipline-trigger`).
+**Worktree:** temporary worktree outside `<workspace-root>` (branch
+`feat/snapshot-caps` → base `feat/snapshot-discipline-trigger`).
 
 ## Task 1 — Per-track byte caps in renderSnapshot (TDD)
 

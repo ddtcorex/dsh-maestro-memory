@@ -5,7 +5,7 @@
 ## 1. Package & profile
 
 - **Package:** `@ddtcorex/dsh-maestro-memory` (`cordis.patch.yml` id `maestro-memory`)
-- **Install:** `dsh plugin --profile web add link:/home/kai/Work/htdocs/maestro-harness/dsh-maestro-memory` (dev) or `github:ddtcorex/dsh-maestro-memory#<sha>` (prod — pin to exact SHA, branch tarballs are stale per `AGENTS.md` pnpm pitfall)
+- **Install:** `dsh plugin --profile web add link:<workspace-root>/packages/dsh-maestro-memory` (dev) or `github:ddtcorex/dsh-maestro-memory#<sha>` (prod — pin to exact SHA, branch tarballs are stale per `AGENTS.md` pnpm pitfall)
 - **Profile rule:** exactly one owner for each compatibility tool (`memory`/`dtodo`/`memory_suggest`); do not keep `dsh-memory-evolve` and `dsh-maestro-memory` in the same profile
 
 ## 2. Host — Cordis seams (M0 audit)
