@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mkdtemp, rm, readFile, writeFile, mkdir } from 'node:fs/promises'
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs'
-import { join } from 'node:path'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
 import { createHash } from 'node:crypto'
 
 function sha256(buf: Buffer | string): string {
@@ -14,7 +14,9 @@ describe('M4-PR-A rehearsal: fixture profile with link: package/patch and one ow
   it('fixture profile helper creates link package and proves single owner', async () => {
     const { createFixtureProfile, assertSingleOwner } = await import('../src/host/migration/fixture.ts')
     const tmp = await mkdtemp(join(tmpdir(), 'm4-profile-'))
-    const packageDir = '/home/kai/Work/htdocs/maestro-harness/dsh-maestro-memory'
+    const packageDir = process.env.MAESTRO_HARNESS_ROOT
+      ? join(process.env.MAESTRO_HARNESS_ROOT, 'packages/dsh-maestro-memory')
+      : resolve(process.cwd(), '.')
     try {
       const profileDir = join(tmp, 'profile')
       const created = await createFixtureProfile({ profileDir, packageDir })
@@ -60,7 +62,7 @@ describe('M4-PR-A rehearsal: fixture profile with link: package/patch and one ow
             private: true,
             dsh: { profile: { bundles: ['@ddtcorex/dsh-maestro-memory', 'some-other-memory'] } },
             dependencies: {
-              '@ddtcorex/dsh-maestro-memory': 'link:/home/kai/Work/htdocs/maestro-harness/dsh-maestro-memory',
+              '@ddtcorex/dsh-maestro-memory': `link:${process.env.MAESTRO_HARNESS_ROOT ? join(process.env.MAESTRO_HARNESS_ROOT, 'packages/dsh-maestro-memory') : resolve(process.cwd(), '.')}`,
               'some-other-memory': '1.0.0',
             },
           },
@@ -132,7 +134,7 @@ describe('M4-PR-A rehearsal: dry-run, backup, adopt, verify against copied schem
     expect(ver.mismatches.length).toBe(0)
 
     // live home must not be touched
-    const liveRoot = join(process.env.HOME ?? '/home/kai', '.dsh', 'memories')
+    const liveRoot = join(process.env.HOME ?? homedir(), '.dsh', 'memories')
     const liveMeta = join(liveRoot, '.maestro-memory', 'backups')
     // we don't assert liveMeta absent (it may exist from prior runs), but our root is isolated
     expect(root).not.toBe(liveRoot)
@@ -219,7 +221,9 @@ describe('M4-PR-A rehearsal: full end-to-end (fixture profile + migrate + reload
     const tmp = await mkdtemp(join(tmpdir(), 'm4-e2e-'))
     const profileDir = join(tmp, 'profile')
     const memoryRoot = join(tmp, 'memories')
-    const packageDir = '/home/kai/Work/htdocs/maestro-harness/dsh-maestro-memory'
+    const packageDir = process.env.MAESTRO_HARNESS_ROOT
+      ? join(process.env.MAESTRO_HARNESS_ROOT, 'packages/dsh-maestro-memory')
+      : resolve(process.cwd(), '.')
     try {
       // 1. fixture profile with link:
       await createFixtureProfile({ profileDir, packageDir })
@@ -231,7 +235,7 @@ describe('M4-PR-A rehearsal: full end-to-end (fixture profile + migrate + reload
 
       // 2. copied schema (not live home)
       await createCopiedMemoryRoot(memoryRoot)
-      const liveRoot = join(process.env.HOME ?? '/home/kai', '.dsh', 'memories')
+      const liveRoot = join(process.env.HOME ?? homedir(), '.dsh', 'memories')
       expect(memoryRoot).not.toBe(liveRoot)
       const memBefore = readFileSync(join(memoryRoot, 'MEMORY.md'), 'utf8')
       const shaBefore = sha256(memBefore)
