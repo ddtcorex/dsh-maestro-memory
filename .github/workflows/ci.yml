@@ -15,3 +15,5 @@ permissions:
 jobs:
   verify:
     uses: ddtcorex/dsh-maestro-ci/.github/workflows/node-plugin.yml@689916eaef46b2bb0b6948e5b4b878d158435d0d
+    with:
+      pnpm-version: ""
