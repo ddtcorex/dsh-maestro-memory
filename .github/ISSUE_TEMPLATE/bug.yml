@@ -1,0 +1,85 @@
+name: Bug Report
+description: Report a reproducible bug in dsh-maestro-memory.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before filing, please search existing issues to avoid duplicates.
+        For security vulnerabilities, use private reporting: https://github.com/ddtcorex/dsh-maestro-memory/security/advisories
+
+  - type: input
+    id: version
+    attributes:
+      label: Package version
+      description: Output of `npm view @ddtcorex/dsh-maestro-memory version` or version in package.json
+      placeholder: "1.0.1"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Which part of the project is affected?
+      options:
+        - Memory store / tracks (memory/user/project/key/daily)
+        - Cordis plugin (src/host / src/client / DSH preset)
+        - Sync / migration / atomic storage
+        - Snapshot / prompt injection
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Node.js, pnpm, Claude Code / Codex CLI / DSH versions
+      render: bash
+      placeholder: |
+        uname -a
+        node --version
+        pnpm --version
+        claude --version
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. ...
+        2. ...
+        3. Observe error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs or screenshots
+      render: shell
+
+  - type: textarea
+    id: contact
+    attributes:
+      label: Contact
+      description: Optional — how to reach you for follow-up (also reachable at kaido4492@gmail.com)
+      placeholder: kaido4492@gmail.com
