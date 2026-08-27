@@ -21,6 +21,7 @@
  */
 
 import { existsSync, readdirSync, statSync, lstatSync, readFileSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { join, resolve, relative } from 'node:path'
 
 export interface SkillBrowseEntry {
@@ -180,10 +181,11 @@ export async function listSkills(opts: ListSkillsOpts = {}): Promise<SkillBrowse
  * if it exists, for metadata/origin listing.
  */
 export function resolveDefaultMaestroSkillsDir(): string | null {
-  const candidates = [
-    '/home/kai/Work/htdocs/maestro-harness/maestro-skills/skills',
+  const candidates: string[] = [
+    process.env.MAESTRO_HARNESS_ROOT ? join(process.env.MAESTRO_HARNESS_ROOT, 'maestro-skills/skills') : null,
     join(process.cwd(), '../maestro-skills/skills'),
-  ]
+    join(homedir(), 'Work/htdocs/maestro-harness/maestro-skills/skills'),
+  ].filter((v): v is string => Boolean(v))
   for (const c of candidates) {
     if (existsSync(c)) return c
   }

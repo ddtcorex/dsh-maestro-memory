@@ -72,7 +72,7 @@ describe('layout', () => {
   })
   it('resolves five memory files', () => {
     const root = '/mem'
-    const cwd = '/home/kai/proj'
+    const cwd = '/home/user/proj'
     const date = '2026-08-24'
     const hash = projectHash(cwd)
     expect(globalMemoryPath(root)).toBe(join(root, 'MEMORY.md'))
@@ -92,7 +92,7 @@ describe('layout', () => {
   })
   it('resolves four todo files', () => {
     const root = '/mem'
-    const cwd = '/home/kai/proj'
+    const cwd = '/home/user/proj'
     const date = '2026-08-24'
     const hash = projectHash(cwd)
     expect(lifeTodoPath(root)).toBe(join(root, 'TODOS-life.md'))
@@ -109,7 +109,7 @@ describe('layout', () => {
   })
   it('resolves archives', () => {
     const root = '/mem'
-    const cwd = '/home/kai/proj'
+    const cwd = '/home/user/proj'
     const hash = projectHash(cwd)
     expect(globalArchivePath(root)).toBe(join(root, 'MEMORY-archive.md'))
     expect(userArchivePath(root)).toBe(join(root, 'USER-archive.md'))
