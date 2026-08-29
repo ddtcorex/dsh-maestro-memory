@@ -600,7 +600,7 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
   ctx.effect(() => {
     const conn2 = (ctx as any).connection ?? (ctx.get && ctx.get('connection'))
     if (!conn2?.rpc?.handle) return () => {}
-    const healthChannel = '/maestro-memory/health'
+    const healthChannel = '/dsh-maestro-memory-health'
     const healthHandler = async (endpoint: string, payload: any) => {
       try {
         const cwdRaw = (payload && typeof payload.cwd === 'string' && payload.cwd.trim()) ? payload.cwd.trim() : ''
@@ -662,7 +662,7 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
       if (r.ok) return { ok: true as const, value: r.value }
       return { ok: false as const, error: { message: r.error } }
     }
-    const d3 = conn3.rpc.handle('/maestro-memory/propose', wrapped, { authority: 'loopback' })
+    const d3 = conn3.rpc.handle('/dsh-maestro-memory-propose', wrapped, { authority: 'loopback' })
     return () => { if (typeof d3 === 'function') d3() }
   }, 'maestro-memory: propose')
 }

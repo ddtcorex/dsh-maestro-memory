@@ -840,7 +840,7 @@ function HealthView({ ctx }: { ctx: any }): React.ReactElement {
       const conn = (ctx as any).connection ?? (ctx as any).get?.('connection')
       if (!conn?.rpc?.call) throw new Error('RPC not available')
       const cwd = (ctx as any)?.sessions?.list?.getSnapshot?.()?.byId?.[(ctx as any)?.sessions?.list?.getSnapshot?.()?.current]?.cwd || ''
-      const res: any = await conn.rpc.call('/maestro-memory/health', 'get', { cwd })
+      const res: any = await conn.rpc.call('/dsh-maestro-memory-health', 'get', { cwd })
       const val = res?.ok === true ? res.value : res
       if (val && typeof val.project !== 'undefined') setHealth(val)
       else setMsg(`unexpected: ${JSON.stringify(val).slice(0,120)}`)
@@ -885,7 +885,7 @@ function HealthView({ ctx }: { ctx: any }): React.ReactElement {
           try {
             const conn2 = (ctx as any).connection ?? (ctx as any).get?.('connection')
             if (!conn2?.rpc?.call) throw new Error('RPC not available')
-            const res: any = await conn2.rpc.call('/maestro-memory/propose', 'add', { content: it.preview, reason: 'promote from Health longest' })
+            const res: any = await conn2.rpc.call('/dsh-maestro-memory-propose', 'add', { content: it.preview, reason: 'promote from Health longest' })
             const ok = res?.ok === true ? res.value : res
             setMsg(ok?.queued ? `proposed (queue ${ok.queued})` : `proposed: ${JSON.stringify(ok).slice(0,80)}`)
           } catch (e: any) { setMsg(`propose failed: ${e?.message ?? String(e)}`) }
