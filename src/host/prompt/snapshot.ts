@@ -10,7 +10,7 @@ export interface SnapshotContext {
 }
 
 /** Default per-section byte budgets for the snapshot prompt. */
-export const SNAPSHOT_SECTION_CAPS = { memory: 2048, user: 4096, key: 6144, recentDaily: 512 } as const
+export const SNAPSHOT_SECTION_CAPS = { memory: 2048, user: 4096, key: 6144, recentDaily: 512, autoRecall: 1024 } as const
 
 export type SnapshotSectionKey = keyof typeof SNAPSHOT_SECTION_CAPS
 
@@ -50,10 +50,11 @@ function fitSection(entries: string[], cap: number): string[] {
 }
 
 /**
- * Bounded snapshot renderer — contract từ README § System Prompt Snapshot:
+ * Bounded snapshot renderer — contract from README § System Prompt Snapshot:
  * Header (sessionId/sessionName) + USER + global MEMORY + current-project KEY
- * (branch-filtered) + end-of-turn discipline note.
- * daily và project KHÔNG inject.
+ * (branch-filtered) + Project Context (auto-recall top-4, 600 chars each)
+ * + Recent Daily + end-of-turn discipline note.
+ * Full daily/project logs are query-only; only the bounded recall slices are injected.
  */
 export function renderSnapshot(
   store: MaestroMemoryStore,
@@ -83,8 +84,21 @@ export function renderSnapshot(
   if (user.length) parts.push(`# User Memory\n${user.join('\n---\n')}`)
   if (key.length) parts.push(`# Project Key Memory\n${key.join('\n---\n')}`)
 
-  // Recent daily slot (512B) — last 2 days' newest entries, only when key <5K or daily exists
-  // Keeps recent context without exceeding cap; daily/project otherwise excluded by design.
+  // Auto-recall: newest 4 project entries for current cwd, each truncated to 600 chars
+  // Mirrors dsh-memory timeline(limit:4, 600 chars) but file-native, no Python.
+  if (ctx.cwd) {
+    try {
+      const proj = store.list('project', ctx.cwd)
+      if (proj.length) {
+        const newest4 = proj.slice(-4).map((e) => e.slice(0, 600))
+        const fitted = fitSection(newest4, (caps as any).autoRecall ?? 1024)
+        if (fitted.length) parts.push(`# Project Context\n${fitted.join('\n---\n')}`)
+      }
+    } catch {}
+  }
+
+  // Recent daily slot (512B) — last 2 days' newest entries
+  // Keeps recent context without exceeding cap; full logs remain query-only.
   try {
     const recentDaily: string[] = []
     for (let i = 0; i < 2; i++) {

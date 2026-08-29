@@ -27,7 +27,7 @@ describe('renderSnapshot contract', () => {
     expect(text).toMatch(/dtodo list/i)
   })
 
-  it('bounded: includes USER+MEMORY+KEY, excludes project, recent daily (512B) may include daily', () => {
+  it('bounded: includes USER+MEMORY+KEY, project via auto-recall (top-4), recent daily (512B) may include daily', () => {
     store.add('memory', '[2026-08-10] global')
     store.add('user', '[2026-08-10] user')
     store.add('key', '[2026-08-10] key entry', cwd)
@@ -37,8 +37,9 @@ describe('renderSnapshot contract', () => {
     expect(text).toContain('global')
     expect(text).toContain('user')
     expect(text).toContain('key entry')
-    // project never injected; daily only via Recent Daily 512B slot (not as main section)
-    expect(text).not.toContain('project log')
+    // project injected only via bounded auto-recall (top-4, 600 chars each under Project Context)
+    expect(text).toContain('Project Context')
+    expect(text).toContain('project log')
     // recent daily: if today's daily exists, it appears under Recent Daily
     expect(text).toContain('Recent Daily')
     expect(text).toContain('daily log')
@@ -136,5 +137,20 @@ describe('renderSnapshot per-track byte caps', () => {
     expect(text).toContain('usr-default-666')
     expect(text).not.toContain('mem-old-777')
     expect(text).toContain('mem-new-888')
+  })
+
+  it('auto-recall: newest 4 project entries appear (oldest dropped)', () => {
+    for (let i = 1; i <= 5; i++) store.add('project', `[2026-08-10] proj-${i} short`, cwd)
+    const text = renderSnapshot(store, { cwd })
+    expect(text).toContain('Project Context')
+    expect(text).not.toContain('proj-1') // oldest dropped (top-4)
+    expect(text).toContain('proj-2')
+    expect(text).toContain('proj-5')
+  })
+  it('auto-recall: each entry truncated to 600 chars', () => {
+    store.add('project', `[2026-08-10] long-entry ` + 'x'.repeat(700), cwd)
+    const text = renderSnapshot(store, { cwd })
+    expect(text).toContain('Project Context')
+    expect(text).not.toContain('x'.repeat(601))
   })
 })
