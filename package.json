@@ -1,6 +1,6 @@
 {
   "name": "@ddtcorex/dsh-maestro-memory",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "private": false,
   "packageManager": "pnpm@11.7.0",
   "description": "Durable layered memory (global / user / project / branch / daily), confirmation-gated writes, todos and skills. Preserves ~/.dsh/memories files in place with in-place adoption, SHA-256 verified backup and rollback.",
