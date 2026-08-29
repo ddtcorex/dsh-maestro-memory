@@ -171,20 +171,23 @@ Dedupes by `(target, content)` within the queue (bumps `hits`), appends to `SUGG
 
 Registered as `ctx.systemPrompt.context({ name: 'memory:snapshot', order: 500, text: (ctx) => renderSnapshot(cwd, branch) })`.
 
-Injected text is **bounded** and deterministic: `USER + global MEMORY + current-project KEY` (branch-filtered if `session.header.branch` is present), plus a header with `sessionId`/`sessionName` and an end-of-turn discipline note (rendered verbatim as `---` + newline + sentence):
+Injected text is **bounded** and deterministic: `USER + global MEMORY + current-project KEY` (branch-filtered if `session.header.branch` is present) + optional `Recent Daily` (last 2 days, 512B) + header with `sessionId`/`sessionName` and an end-of-turn discipline note (rendered verbatim as `---` + newline + sentence):
 
 > End of every turn you must: 1. Write daily+project via memory entries (daily+project in one call) 2. Check dtodo list (bounded, max 8)
+> For important project decisions (convention, incident, infra) use memory_suggest target=key with reason, not memory add.
 
-`daily` and `project log` (`projects/<hash>/MEMORY.md`) are queryable via `memory` but **not injected**, to keep prompt cost predictable. New `prompt/snapshot.ts` must reproduce this contract or agents silently stop writing logs.
+`project log` (`projects/<hash>/MEMORY.md`) is queryable via `memory` but **not injected**, to keep prompt cost predictable. `daily` is **only** via `Recent Daily` (512B, last 2 days' newest entries) — full daily history remains query-only. New `prompt/snapshot.ts` must reproduce this contract or agents silently stop writing logs.
 
-Each injected section also enforces a **per-track byte cap** — defaults `SNAPSHOT_SECTION_CAPS = { memory: 2048, user: 4096, key: 6144 }`, overridable per call via `renderSnapshot(store, ctx, { caps })`. Entries are kept newest-first; the oldest overflow is dropped. The newest entry is always kept: if it alone exceeds the cap **and** carries an `[summary:…]` header tag (parsed by `ENTRY_HEAD_RE`), it renders compacted to `head + [summary:…]`; untagged oversize entries stay whole rather than vanishing.
+Each injected section also enforces a **per-track byte cap** — defaults `SNAPSHOT_SECTION_CAPS = { memory: 2048, user: 4096, key: 6144, recentDaily: 512 }` (total 12.5K), overridable per call via `renderSnapshot(store, ctx, { caps })`. Entries are kept newest-first; the oldest overflow is dropped. The newest entry is always kept: if it alone exceeds the cap **and** carries an `[summary:…]` header tag (parsed by `ENTRY_HEAD_RE`), it renders compacted to `head + [summary:…]`; untagged oversize entries stay whole rather than vanishing.
+
+**Gated `key`:** `memory add` with `target=key` via tool (`exec.agent` present) is now **gated** — it returns `key is gated — use memory_suggest target=key with reason` and requires the confirmation queue. Direct `store.add('key', ...)` from CLI/scripts (`maestro-memory-remediate.mjs`, tests) still works.
 
 ---
 
 ## UI & RPC
 
-- **UI:** exactly one `conversation.view` slot `{ name:'conversation.view', id:'maestro-memory', order:40, label:()=>'Memory' }` with internal tabs **Memory / Review queue / Todos**. Uses package-private RPC, no HTTP, no DOM hacks. Client injects `['slots','locale','conversation','sessions','connection']`.
-- **RPC channel:** `/dsh-maestro-memory` (`ctx.connection.rpc.handle` host, `ctx.connection.rpc.call` client). Endpoints: `queue.list`, `queue.decide` (`approve`/`reject`/`archive` with optional `edits`/`targets` + `cwd`), `memory.list`, `todo.list`, `todo.mutate`, `migration.inspect`/`dryRun`/`run`/`verify`, `status` (`{ queue, blocked }`). `migration.run` via RPC requires `payload.apply === true`.
+- **UI:** exactly one `conversation.view` slot `{ name:'conversation.view', id:'maestro-memory', order:40, label:()=>'Memory' }` with internal tabs **Memory / Review queue / Todos / Skills / Health**. Health shows `project coverage` (with summary %), `daily last 7d`, `longest` 5 entries with **Suggest as KEY** button (→ `memory_suggest` queue), and `Discipline` metric (avg calls/session). Uses package-private RPC, no HTTP, no DOM hacks. Client injects `['slots','sessions','connection']`.
+- **RPC channels:** `/dsh-maestro-memory` (`ctx.connection.rpc.handle` host, `ctx.connection.rpc.call` client). Endpoints: `queue.list`, `queue.decide` (`approve`/`reject`/`archive` with optional `edits`/`targets` + `cwd`), `memory.list`, `todo.list`, `todo.mutate`, `migration.inspect`/`dryRun`/`run`/`verify`, `status` (`{ queue, blocked }`). `migration.run` via RPC requires `payload.apply === true`. **Plus loopback-only:** `/maestro-memory/health` (`get` → `{project:{total,withSummary,coverage}, daily:{counts[7]}, longest[5]}`) and `/maestro-memory/propose` (`add` → `enqueueSuggestion` for `key`, used by Health button).
 
 ---
 
