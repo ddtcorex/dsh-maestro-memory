@@ -99,12 +99,15 @@ export function renderSnapshot(
 
   // Recent daily slot (512B) — last 2 days' newest entries
   // Keeps recent context without exceeding cap; full logs remain query-only.
+  // Use local calendar (matching store.todayStamp) to avoid UTC/local drift near midnight.
   try {
     const recentDaily: string[] = []
     for (let i = 0; i < 2; i++) {
       const d = new Date()
       d.setDate(d.getDate() - i)
-      const ds = d.toISOString().slice(0, 10)
+      const mm = String(d.getMonth() + 1).padStart(2, '0')
+      const dd = String(d.getDate()).padStart(2, '0')
+      const ds = `${d.getFullYear()}-${mm}-${dd}`
       try {
         const list: string[] = store.list('daily', undefined, { date: ds } as any)
         if (list.length) recentDaily.push(list[list.length - 1])

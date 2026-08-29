@@ -4,6 +4,21 @@ All notable changes to this project are documented in this file. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-08-29
+
+### Added
+
+- **Memory tab redesign** (`src/client/index.tsx`, maestro-design Minimalism + Bento Grid, DSH tokens only). Desktop `200px nav rail + bento` (`≥1024px`), mobile horizontal `tablist` with `44px` touch, safe-area insets, `header` Refresh inline with title.
+
+### Changed
+
+- Align `memx-layout`/`memx-nav` breakpoint to `1024px` (match `dsh-maestro-mobile` `1023px` drawer), fix `memx-search`/`memx-field` `min-width:0` overflow on 375px.
+
+### Fixed
+
+- Client a11y: `prefers-reduced-motion` typo (`.card` → `.memx-card` + badge), `search:focus-within` ring, `aria-label` on cwd/todo/review inputs, `role=tablist/tab/tabpanel` with `aria-selected`.
+- Host `renderSnapshot` Recent Daily timezone: use local calendar (`getMonth/getDate`) instead of UTC `toISOString` to match `store.todayStamp` (fixes midnight ICT flake, 268/268 green).
+
 ## [1.1.0] - 2026-08-29
 
 Adopts proven mechanisms from `FuRongJun-1999/dsh-memory` in file-native form (no Python). Live-validated in chat, 268 tests.
