@@ -6,6 +6,8 @@ export interface MaestroMemoryConfig {
     autoMemory?: Partial<AutoMemoryOptions>;
 }
 export declare const DEFAULTS: Required<MaestroMemoryConfig>;
+export declare const READ_ACTIONS: Set<string>;
+export declare function isMemoryConcurrencySafe(args: any): boolean;
 export type MemoryTarget = 'memory' | 'user' | 'project' | 'key' | 'daily';
 export type MemoryAction = 'add' | 'list' | 'replace' | 'remove' | 'archive' | 'expand';
 export declare function apply(ctx: any, config?: MaestroMemoryConfig): void;
