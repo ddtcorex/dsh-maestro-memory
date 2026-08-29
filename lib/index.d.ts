@@ -1,7 +1,9 @@
+import { type AutoMemoryOptions } from './auto-memory.ts';
 export declare const inject: readonly ["tools", "systemPrompt", "connection"];
 export interface MaestroMemoryConfig {
     memoryDir?: string | null;
     snapshotOrder?: number;
+    autoMemory?: Partial<AutoMemoryOptions>;
 }
 export declare const DEFAULTS: Required<MaestroMemoryConfig>;
 export type MemoryTarget = 'memory' | 'user' | 'project' | 'key' | 'daily';

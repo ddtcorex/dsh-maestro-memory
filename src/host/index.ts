@@ -15,17 +15,20 @@ import { SyncService } from './sync/service.ts'
 import { RealGitAdapter } from './sync/git.ts'
 import { listSkillsSync, resolveDefaultMaestroSkillsDir } from './skills-browser.ts'
 import { renderSnapshot } from './prompt/snapshot.ts'
+import { installAutoMemoryHooks, DEFAULT_AUTO_MEMORY, type AutoMemoryOptions } from './auto-memory.ts'
 
 export const inject = ['tools', 'systemPrompt', 'connection'] as const
 
 export interface MaestroMemoryConfig {
   memoryDir?: string | null
   snapshotOrder?: number
+  autoMemory?: Partial<AutoMemoryOptions>
 }
 
 export const DEFAULTS: Required<MaestroMemoryConfig> = {
   memoryDir: null,
   snapshotOrder: 500,
+  autoMemory: { ...DEFAULT_AUTO_MEMORY },
 }
 
 // Extended unions for memory tool (M2-PR-A + M2-PR-B queue)
@@ -48,6 +51,15 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
   const root = resolveMemoryRoot(config.memoryDir ?? null)
   const queue = new SuggestionQueue(suggestionsPath(root))
   const syncService = new SyncService(config.memoryDir ?? null, new RealGitAdapter())
+
+  // Auto-memory (opt-in, default disabled) — session/event → store
+  ctx.effect(() => {
+    const am: AutoMemoryOptions = { ...DEFAULT_AUTO_MEMORY, ...(config.autoMemory ?? {}) }
+    const dispose = installAutoMemoryHooks(ctx, store, am)
+    return () => {
+      if (typeof dispose === 'function') dispose()
+    }
+  }, 'maestro-memory: auto-memory')
 
   ctx.effect(() => {
     const dispose = ctx.systemPrompt.context({
