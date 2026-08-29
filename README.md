@@ -187,7 +187,18 @@ Each injected section also enforces a **per-track byte cap** — defaults `SNAPS
 ## UI & RPC
 
 - **UI:** exactly one `conversation.view` slot `{ name:'conversation.view', id:'maestro-memory', order:40, label:()=>'Memory' }` with internal tabs **Memory / Review queue / Todos / Skills / Health**. Health shows `project coverage` (with summary %), `daily last 7d`, `longest` 5 entries with **Suggest as KEY** button (→ `memory_suggest` queue), and `Discipline` metric (avg calls/session). Uses package-private RPC, no HTTP, no DOM hacks. Client injects `['slots','sessions','connection']`.
-- **RPC channels:** `/dsh-maestro-memory` (`ctx.connection.rpc.handle` host, `ctx.connection.rpc.call` client). Endpoints: `queue.list`, `queue.decide` (`approve`/`reject`/`archive` with optional `edits`/`targets` + `cwd`), `memory.list`, `todo.list`, `todo.mutate`, `migration.inspect`/`dryRun`/`run`/`verify`, `status` (`{ queue, blocked }`). `migration.run` via RPC requires `payload.apply === true`. **Plus loopback-only:** `/maestro-memory/health` (`get` → `{project:{total,withSummary,coverage}, daily:{counts[7]}, longest[5]}`) and `/maestro-memory/propose` (`add` → `enqueueSuggestion` for `key`, used by Health button).
+- **RPC channels:** `/dsh-maestro-memory` (`ctx.connection.rpc.handle` host, `ctx.connection.rpc.call` client). Endpoints: `queue.list`, `queue.decide` (`approve`/`reject`/`archive` with optional `edits`/`targets` + `cwd`), `memory.list`, `todo.list`, `todo.mutate`, `migration.inspect`/`dryRun`/`run`/`verify`, `status` (`{ queue, blocked }`). `migration.run` via RPC requires `payload.apply === true`. **Plus loopback-only:** `/dsh-maestro-memory-health` (`get` → `{project:{total,withSummary,coverage}, daily:{counts[7]}, longest[5]}`) and `/dsh-maestro-memory-propose` (`add` → `enqueueSuggestion` for `key`, used by Health button).
+
+---
+
+## Maintenance
+
+Weekly keep `project` from re-growing (after `remediate` 100%):
+
+```sh
+node scripts/maestro-memory-remediate.mjs --apply --threshold-days 14
+node scripts/enforce-rules.mjs --check-memory --threshold 90  # still PASS
+```
 
 ---
 
