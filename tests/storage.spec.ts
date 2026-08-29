@@ -31,6 +31,8 @@ import {
   allTodoPaths,
   allArchivePaths,
   allMetadataPaths,
+  projectArchivePath,
+  projectArchiveDir,
 } from '../src/host/storage/layout.ts'
 import { isDuplicate, stripEntryId } from '../src/host/storage/atomic-store.ts'
 
@@ -121,7 +123,28 @@ describe('layout', () => {
       user: userArchivePath(root),
       key: projectKeyArchivePath(root, cwd),
       todo: todoArchivePath(root),
+      projectMemoryArchive: projectArchivePath(root, cwd),
     })
+  })
+  it('projectArchivePath resolves to projects/<hash>/MEMORY-archive.md', () => {
+    const root = '/tmp/mem'
+    const cwd = '/tmp/test-project'
+    const h = projectHash(cwd)
+    expect(projectArchivePath(root, cwd)).toBe(join(root, 'projects', h, 'MEMORY-archive.md'))
+  })
+  it('projectArchiveDir resolves to projects/<hash> dir', () => {
+    const root = '/tmp/mem'
+    const cwd = '/tmp/test-project'
+    const h = projectHash(cwd)
+    expect(projectArchiveDir(root, cwd)).toBe(join(root, 'projects', h))
+    expect(projectArchiveDir(root, cwd)).toBe(projectDir(root, cwd))
+  })
+  it('allArchivePaths now includes projectMemoryArchive', () => {
+    const root = '/tmp/mem'
+    const cwd = '/tmp/test-project'
+    const r = allArchivePaths(root, cwd)
+    expect(r).toHaveProperty('projectMemoryArchive')
+    expect(r.projectMemoryArchive).toBe(projectArchivePath(root, cwd))
   })
   it('resolves metadata', () => {
     const root = '/mem'

@@ -21,6 +21,8 @@ export declare function projectDir(root: string, cwd: string): string;
 export declare function projectMemoryPath(root: string, cwd: string): string;
 export declare function projectKeyPath(root: string, cwd: string): string;
 export declare function projectKeyArchivePath(root: string, cwd: string): string;
+export declare function projectArchivePath(root: string, cwd: string): string;
+export declare function projectArchiveDir(root: string, cwd: string): string;
 export declare function projectTodoPath(root: string, cwd: string): string;
 export declare function lifeTodoPath(root: string): string;
 export declare function workTodoPath(root: string): string;
@@ -58,6 +60,7 @@ export declare function allArchivePaths(root: string, cwd: string): {
     user: string;
     key: string;
     todo: string;
+    projectMemoryArchive: string;
 };
 /**
  * Resolve metadata files at once (pure).

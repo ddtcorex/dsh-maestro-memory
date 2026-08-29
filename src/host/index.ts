@@ -8,7 +8,7 @@ import { buildFeedbackLine } from './memory/feedback.ts'
 import { TodoStore, resolveQuadrant, DEFAULT_VIEW_LIMIT } from './todo/store.ts'
 import { TODO_TARGETS, TODO_STATUSES } from './storage/legacy-format.ts'
 import { SuggestionQueue, enqueueSuggestion, approveSuggestions, rejectSuggestions } from './review/queue.ts'
-import { resolveMemoryRoot, suggestionsPath, globalArchivePath, userArchivePath, projectKeyArchivePath, todoArchivePath } from './storage/layout.ts'
+import { resolveMemoryRoot, suggestionsPath, globalArchivePath, userArchivePath, projectKeyArchivePath, projectArchivePath, projectMemoryPath, dailyPath, todoArchivePath } from './storage/layout.ts'
 import { appendEntryAtomicSync } from './storage/atomic-store.ts'
 import * as migration from './migration/service.ts'
 import { SyncService } from './sync/service.ts'
@@ -588,4 +588,48 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
       if (typeof dispose === 'function') dispose()
     }
   }, 'maestro-memory: rpc')
+
+  // Health dashboard handler (Task6) — loopback only, returns coverage + daily counts
+  ctx.effect(() => {
+    const conn2 = (ctx as any).connection ?? (ctx.get && ctx.get('connection'))
+    if (!conn2?.rpc?.handle) return () => {}
+    const healthChannel = '/maestro-memory/health'
+    const healthHandler = async (endpoint: string, payload: any) => {
+      try {
+        const cwdRaw = (payload && typeof payload.cwd === 'string' && payload.cwd.trim()) ? payload.cwd.trim() : ''
+        // Health requires explicit cwd; if missing, return empty (client should pass sessionCwd)
+        if (!cwdRaw) {
+          return { ok: true, value: { project: { total: 0, withSummary: 0, coverage: 100 }, daily: { counts: [0,0,0,0,0,0,0] }, longest: [] } }
+        }
+        const cwd = cwdRaw
+        const projectEntries = store.list('project', cwd)
+        const total = projectEntries.length
+        const withSummary = projectEntries.filter((e: string) => /\[summary:/.test(e)).length
+        const coverage = total ? (withSummary / total) * 100 : 100
+        // daily last 7 days
+        const dailyCounts: number[] = []
+        for (let i = 6; i >= 0; i--) {
+          const d = new Date()
+          d.setDate(d.getDate() - i)
+          const ds = d.toISOString().slice(0, 10)
+          try {
+            const list = store.list('daily', undefined, { date: ds } as any)
+            dailyCounts.push(Array.isArray(list) ? list.length : 0)
+          } catch { dailyCounts.push(0) }
+        }
+        const longest = [...projectEntries].sort((a, b) => b.length - a.length).slice(0, 5).map((e) => ({ len: e.length, preview: e.slice(0, 80).replace(/\n/g, ' ') }))
+        const health = { project: { total, withSummary, coverage }, daily: { counts: dailyCounts }, longest }
+        return { ok: true, value: health }
+      } catch (e: any) {
+        return { ok: false, error: e?.message ?? String(e) }
+      }
+    }
+    const h = async (ep: string, pl: unknown, _s: AbortSignal) => {
+      const res: any = await healthHandler(ep, pl)
+      if (res.ok) return { ok: true as const, value: res.value }
+      return { ok: false as const, error: { message: res.error } }
+    }
+    const dispose2 = conn2.rpc.handle(healthChannel, h, { authority: 'loopback' })
+    return () => { if (typeof dispose2 === 'function') dispose2() }
+  }, 'maestro-memory: health')
 }

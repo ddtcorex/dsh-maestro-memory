@@ -364,3 +364,40 @@ describe('M2 keep project/daily logs out of snapshot', () => {
     expect(snapDev).not.toContain('main only')
   })
 })
+
+describe('M1 auto-date/summary hardening', () => {
+  it('add(project, raw without date) injects today date', () => {
+    const r = store.add('project', 'raw content without date', cwd)
+    expect(r.ok).toBe(true)
+    const entries = store.list('project', cwd)
+    expect(entries[0]).toMatch(/^\[\d{4}-\d{2}-\d{2}/)
+  })
+  it('add(project, date but no summary) injects summary', () => {
+    store.add('project', '[2026-08-29] content without summary', cwd)
+    const e = store.list('project', cwd)[0]
+    expect(e).toMatch(/\[summary:/)
+  })
+  it('add with existing summary does not duplicate', () => {
+    store.add('project', '[2026-08-29] content [summary:exists]', cwd)
+    const e = store.list('project', cwd)[0]
+    expect((e.match(/\[summary:/g) || []).length).toBe(1)
+  })
+  it('daily add still stores entry (date injected)', () => {
+    store.add('daily', 'raw daily without date', undefined)
+    const today = todayStr()
+    const dailyEntries = store.list('daily', undefined, { date: today })
+    expect(dailyEntries.length).toBeGreaterThan(0)
+    expect(dailyEntries[0]).toMatch(/raw daily/)
+  })
+  it('replace without summary injects it', () => {
+    store.add('project', '[2026-08-29] old content here [summary:old]', cwd)
+    store.replace('project', 'old content here', '[2026-08-29] new without summary', cwd)
+    const e = store.list('project', cwd)[0]
+    expect(e).toMatch(/\[summary:/)
+  })
+  it('isDuplicate ignores summary difference', () => {
+    store.add('project', '[2026-08-29] same body [summary:a]', cwd)
+    const dup = store.add('project', '[2026-08-29] same body [summary:b]', cwd)
+    expect(dup).toEqual(expect.objectContaining({ ok: true, duplicate: true }))
+  })
+})
