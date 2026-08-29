@@ -67,6 +67,14 @@ export function projectKeyPath(root: string, cwd: string): string {
 export function projectKeyArchivePath(root: string, cwd: string): string {
   return join(projectDir(root, cwd), 'KEY-archive.md')
 }
+export function projectArchivePath(root: string, cwd: string): string {
+  if (!cwd) throw new Error('projectArchivePath: cwd is required')
+  return join(projectDir(root, cwd), 'MEMORY-archive.md')
+}
+export function projectArchiveDir(root: string, cwd: string): string {
+  if (!cwd) throw new Error('projectArchiveDir: cwd is required')
+  return projectDir(root, cwd)
+}
 export function projectTodoPath(root: string, cwd: string): string {
   return join(projectDir(root, cwd), 'TODOS.md')
 }
@@ -148,12 +156,14 @@ export function allArchivePaths(root: string, cwd: string): {
   user: string
   key: string
   todo: string
+  projectMemoryArchive: string
 } {
   return {
     memory: globalArchivePath(root),
     user: userArchivePath(root),
     key: projectKeyArchivePath(root, cwd),
     todo: todoArchivePath(root),
+    projectMemoryArchive: projectArchivePath(root, cwd),
   }
 }
 
