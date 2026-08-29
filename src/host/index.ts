@@ -16,6 +16,7 @@ import { RealGitAdapter } from './sync/git.ts'
 import { listSkillsSync, resolveDefaultMaestroSkillsDir } from './skills-browser.ts'
 import { renderSnapshot } from './prompt/snapshot.ts'
 import { installAutoMemoryHooks, DEFAULT_AUTO_MEMORY, type AutoMemoryOptions } from './auto-memory.ts'
+import { computeFiveDim } from './health-score.ts'
 
 export const inject = ['tools', 'systemPrompt', 'connection'] as const
 
@@ -648,7 +649,16 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
           } catch { dailyCounts.push(0) }
         }
         const longest = [...projectEntries].sort((a, b) => b.length - a.length).slice(0, 5).map((e) => ({ len: e.length, preview: e.slice(0, 80).replace(/\n/g, ' ') }))
-        const health = { project: { total, withSummary, coverage }, daily: { counts: dailyCounts }, longest }
+        const fiveDim = computeFiveDim({
+          projectTotal: total,
+          withSummary,
+          dailyCounts,
+          longestLen: longest[0]?.len ?? 0,
+          hasAutoRecall: true,
+          hasSanitize: true,
+          hasGatedQueue: true,
+        })
+        const health = { project: { total, withSummary, coverage }, daily: { counts: dailyCounts }, longest, fiveDim }
         return { ok: true, value: health }
       } catch (e: any) {
         return { ok: false, error: e?.message ?? String(e) }
