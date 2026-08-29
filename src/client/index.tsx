@@ -830,9 +830,57 @@ function MemoryListView({ ctx }: { ctx: any }): React.ReactElement {
   )
 }
 
+function HealthView({ ctx }: { ctx: any }): React.ReactElement {
+  const [health, setHealth] = React.useState<any>(null)
+  const [loading, setLoading] = React.useState(true)
+  const [msg, setMsg] = React.useState('')
+  const load = React.useCallback(async () => {
+    setLoading(true); setMsg('')
+    try {
+      const conn = (ctx as any).connection ?? (ctx as any).get?.('connection')
+      if (!conn?.rpc?.call) throw new Error('RPC not available')
+      const cwd = (ctx as any)?.sessions?.list?.getSnapshot?.()?.byId?.[(ctx as any)?.sessions?.list?.getSnapshot?.()?.current]?.cwd || ''
+      const res: any = await conn.rpc.call('/maestro-memory/health', 'get', { cwd })
+      const val = res?.ok === true ? res.value : res
+      if (val && typeof val.project !== 'undefined') setHealth(val)
+      else setMsg(`unexpected: ${JSON.stringify(val).slice(0,120)}`)
+    } catch (e: any) { setMsg(`load failed: ${e?.message ?? String(e)}`) }
+    finally { setLoading(false) }
+  }, [ctx])
+  React.useEffect(() => { load() }, [load])
+  if (loading) return React.createElement('div', null, 'Loading health…')
+  if (msg) return React.createElement('div', null, React.createElement('div', { style: { color: STYLE.error } }, msg), React.createElement('button', { onClick: load, style: { marginTop: 8 } }, 'Retry'))
+  if (!health) return React.createElement('div', null, 'No data')
+  const cov = health.project.coverage as number
+  const color = cov >= 90 ? STYLE.success : cov >= 50 ? '#e6a23c' : STYLE.error
+  return React.createElement('div', null,
+    React.createElement('div', { style: { display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 12 } },
+      React.createElement('div', { className: 'card', style: { flex: 1, minWidth: 140 } },
+        React.createElement('div', { className: 'muted' }, 'Project entries'),
+        React.createElement('div', { style: { fontWeight: 700 } }, String(health.project.total)),
+        React.createElement('div', { className: 'muted' }, `${health.project.withSummary} with summary`),
+      ),
+      React.createElement('div', { className: 'card', style: { flex: 1, minWidth: 140 } },
+        React.createElement('div', { className: 'muted' }, 'Coverage'),
+        React.createElement('div', { style: { fontWeight: 700, color } }, `${cov.toFixed(1)}%`),
+        React.createElement('div', { className: 'muted' }, cov >= 90 ? '✅ PASS' : '❌ FAIL (<90%)'),
+      ),
+      React.createElement('div', { className: 'card', style: { flex: 1, minWidth: 140 } },
+        React.createElement('div', { className: 'muted' }, 'Daily last 7d'),
+        React.createElement('div', { style: { fontWeight: 600 } }, (health.daily.counts as number[]).join(' · ')),
+      ),
+    ),
+    React.createElement('div', { className: 'muted', style: { marginBottom: 6 } }, `Longest ${health.longest.length} entries`),
+    ...health.longest.map((it: any, i: number) => React.createElement('div', { key: i, className: 'card', style: { marginBottom: 6 } },
+      React.createElement('div', { className: 'muted' }, `${it.len} chars`), React.createElement('div', { style: { whiteSpace: 'pre-wrap' } }, it.preview),
+    )),
+    React.createElement('button', { onClick: load, style: { marginTop: 12, padding: '6px 12px' }, 'data-testid': 'health-refresh' }, 'Refresh'),
+  )
+}
+
 function MemoryView({ ctx }: { ctx: any }): React.ReactElement {
   const rpc = useRpc(ctx)
-  const [tab, setTab] = React.useState<'memory' | 'review' | 'todos' | 'skills'>('memory')
+  const [tab, setTab] = React.useState<'memory' | 'review' | 'todos' | 'skills' | 'health'>('memory')
   const [pending, setPending] = React.useState(0)
 
   const refreshPending = React.useCallback(async () => {
@@ -855,7 +903,7 @@ function MemoryView({ ctx }: { ctx: any }): React.ReactElement {
     React.createElement(
       'div',
       { className: 'tabs', role: 'tablist' },
-      (['memory', 'review', 'todos', 'skills'] as const).map((k) =>
+      (['memory', 'review', 'todos', 'skills', 'health'] as const).map((k) =>
         React.createElement(
           'button',
           {
@@ -879,7 +927,9 @@ function MemoryView({ ctx }: { ctx: any }): React.ReactElement {
         ? React.createElement(ReviewQueueView, { ctx, onPendingChange: setPending })
         : tab === 'todos'
           ? React.createElement(TodosView, { ctx })
-          : React.createElement(SkillsView, { ctx }),
+          : tab === 'health'
+            ? React.createElement(HealthView, { ctx })
+            : React.createElement(SkillsView, { ctx }),
   )
 }
 
