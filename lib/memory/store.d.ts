@@ -30,11 +30,12 @@ export declare class MaestroMemoryStore {
     /** List entries with optional query filters */
     list(target: MemoryTarget, cwd?: string, opts?: ListOpts): string[];
     private filterEntries;
-    /** Add entry (with optional branches/summary for key) — hardened: auto date + auto summary */
+    /** Add entry (with optional branches/summary for key) — hardened: auto date + auto summary + desensitize */
     add(target: MemoryTarget, entry: string, cwd?: string, opts?: {
         branches?: string;
         summary?: string;
         date?: string;
+        desensitize?: boolean;
     }): {
         ok: true;
         duplicate?: boolean;
