@@ -107,6 +107,9 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
             case 'add': {
               // Batch path: entries[] takes precedence over the single target/content form.
               if (Array.isArray(args.entries)) {
+                if (exec?.agent && args.entries.some((e: any) => String(e.target ?? '').trim() === 'key')) {
+                  return { content: [{ type: 'text', text: 'key is gated — use memory_suggest target=key with reason (batch contains key)' }] }
+                }
                 if (!args.target && !args.content) {
                   // Inject the session cwd as per-entry fallback, mirroring the
                   // single-add path — otherwise project/key entries without an
@@ -120,6 +123,10 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
                 }
               } else if (!target) {
                 return { content: [{ type: 'text', text: 'add failed: target is required for single add (or pass entries[])' }] }
+              }
+              // G1: gate key via agent — direct memory add for key must go through memory_suggest
+              if (target === 'key' && exec?.agent) {
+                return { content: [{ type: 'text', text: 'key is gated — use memory_suggest target=key with reason (direct memory add for key is CLI-only)' }] }
               }
               let entryText = args.content ?? ''
               if (args.sentiment !== undefined) {
@@ -632,4 +639,30 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
     const dispose2 = conn2.rpc.handle(healthChannel, h, { authority: 'loopback' })
     return () => { if (typeof dispose2 === 'function') dispose2() }
   }, 'maestro-memory: health')
+
+  // Propose handler for Health → queue (Task4) — loopback only
+  ctx.effect(() => {
+    const conn3 = (ctx as any).connection ?? (ctx.get && ctx.get('connection'))
+    if (!conn3?.rpc?.handle) return () => {}
+    const proposeHandler = async (endpoint: string, payload: any) => {
+      try {
+        const content = String(payload?.content ?? '').trim()
+        const reason = String(payload?.reason ?? 'promote from Health longest').trim()
+        if (!content) return { ok: false, error: 'empty content' }
+        if (!reason) return { ok: false, error: 'empty reason' }
+        const res = enqueueSuggestion(queue, 'key', content, reason, undefined as any)
+        if (!res.ok) return { ok: false, error: (res as any).message ?? 'failed' }
+        return { ok: true, value: res }
+      } catch (e: any) {
+        return { ok: false, error: e?.message ?? String(e) }
+      }
+    }
+    const wrapped = async (ep: string, pl: unknown, _s: AbortSignal) => {
+      const r: any = await proposeHandler(ep, pl)
+      if (r.ok) return { ok: true as const, value: r.value }
+      return { ok: false as const, error: { message: r.error } }
+    }
+    const d3 = conn3.rpc.handle('/maestro-memory/propose', wrapped, { authority: 'loopback' })
+    return () => { if (typeof d3 === 'function') d3() }
+  }, 'maestro-memory: propose')
 }

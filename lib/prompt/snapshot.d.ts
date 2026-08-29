@@ -10,6 +10,7 @@ export declare const SNAPSHOT_SECTION_CAPS: {
     readonly memory: 2048;
     readonly user: 4096;
     readonly key: 6144;
+    readonly recentDaily: 512;
 };
 export type SnapshotSectionKey = keyof typeof SNAPSHOT_SECTION_CAPS;
 export interface SnapshotRenderOpts {
