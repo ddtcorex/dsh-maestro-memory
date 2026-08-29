@@ -433,20 +433,6 @@ Run `pnpm test` after host changes, `pnpm run verify` after TypeScript changes, 
 
 ---
 
-## Ghi chú vận hành (Tiếng Việt — ngắn gọn)
-
-> English là ngôn ngữ chính của tài liệu và mã nguồn. Phần này chỉ tóm tắt thao tác cho người vận hành tiếng Việt.
-
-- **Cài đặt:** `pnpm install` → `pnpm run build` → `pnpm run verify` → `pnpm test`. Thêm plugin vào profile bằng `dsh plugin --profile web add link:/path/to/dsh-maestro-memory` (không copy `cordis.patch.yml` vào profile).
-- **Công cụ hỗ trợ:** `memory` (5 track), `dtodo` (4 track, smart view 8), `memory_suggest` (đề xuất phải được duyệt), `memory_review_status`. `skill_manage` chỉ khi bật module tùy chọn.
-- **Cutover (chuyển đổi):** chỉ chạy một plugin sở hữu `memory`/`dtodo`. Không chạy đồng thời `dsh-memory-evolve` và `dsh-maestro-memory`. Thực hiện trên bản copy trước, sau đó mới áp dụng lên `~/.dsh/memories`.
-- **Migration:** `node scripts/migrate.mjs --root <path>` (mặc định chỉ đọc). `--apply` mới ghi backup + `schema.json`. `--verify` kiểm tra `sha256` + tồn kho; nếu lệch sẽ ghi `write-block.json` và chặn ghi.
-- **Rollback:** `await rollback(root, runId)` khôi phục byte-identical từ `backups/<runId>/files/`; xóa `write-block.json` khi xong. Trước khi có ghi mới, rollback chỉ là đổi profile.
-- **Tính năng đã loại bỏ:** COI/broadcast, advisor, notify/`de_channel_send`, search, prompt library, model registry, bookmarks/mermaid/canvas. Chi tiết xem bảng "Removed Features".
-- **CI:** `build` + `typecheck` + `unit` + `integration` + `migration` + `rehearsal` + `client` + `full` — tất cả phải xanh trước khi merge.
-
----
-
 ## Documentation
 
 Keep current behavior in `README.md`. Do not add plans, transient investigation logs, or duplicate specifications under `docs/`; capture only durable operator and architecture knowledge. The one exception is Superpowers artifacts: specs under `docs/superpowers/specs/` and plans under `docs/superpowers/plans/` are kept as the design record for each change batch.
