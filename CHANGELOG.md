@@ -4,6 +4,23 @@ All notable changes to this project are documented in this file. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-08-29
+
+Adopts proven mechanisms from `FuRongJun-1999/dsh-memory` in file-native form (no Python). Live-validated in chat, 268 tests.
+
+### Added
+
+- **Desensitize sanitizer** (`src/host/memory/sanitize.ts`, 7 patterns: `sk-`, `api_key`, `password`, `Bearer`, `ID`, `phone` with English `[Filtered:...]`; pure-credential → `content filtered`).
+- **Opt-in auto-memory hook** (`src/host/auto-memory.ts`, `config.autoMemory`, `session/event` → project/daily, desensitize + dedupe, default `enabled:false`).
+- **Snapshot auto-recall top-4** (`src/host/prompt/snapshot.ts`, new `Project Context` section, newest 4 project entries 600 chars each, cap `autoRecall:1024`, keeps `recentDaily:512`).
+- **Concurrency + abort gating** (`READ_ACTIONS`, `isMemoryConcurrencySafe`, `isConcurrencySafe` for `memory`/`dtodo`/`memory_suggest` + `signal.aborted` checks).
+- **Health 5-dim scoring** (`src/host/health-score.ts`, `S/R/J/C/Safety` 0-10, `composite = min*0.4+mean*0.6`, client `HealthView` 5 cards).
+
+### Changed
+
+- `store.add` desensitizes by default (`{desensitize:false}` to opt-out for tests).
+- Snapshot caps now `2K/4K/6K+0.5K+1K` (autoRecall) with bounded `Project Context`.
+
 ## [1.0.1] - 2026-08-25
 
 Fix a live gap in the `memory` tool: the `daily` track only honored an explicit
