@@ -11,6 +11,7 @@ export declare const SNAPSHOT_SECTION_CAPS: {
     readonly user: 4096;
     readonly key: 6144;
     readonly recentDaily: 512;
+    readonly autoRecall: 1024;
 };
 export type SnapshotSectionKey = keyof typeof SNAPSHOT_SECTION_CAPS;
 export interface SnapshotRenderOpts {
@@ -18,10 +19,11 @@ export interface SnapshotRenderOpts {
     caps?: Partial<Record<SnapshotSectionKey, number>>;
 }
 /**
- * Bounded snapshot renderer — contract từ README § System Prompt Snapshot:
+ * Bounded snapshot renderer — contract from README § System Prompt Snapshot:
  * Header (sessionId/sessionName) + USER + global MEMORY + current-project KEY
- * (branch-filtered) + end-of-turn discipline note.
- * daily và project KHÔNG inject.
+ * (branch-filtered) + Project Context (auto-recall top-4, 600 chars each)
+ * + Recent Daily + end-of-turn discipline note.
+ * Full daily/project logs are query-only; only the bounded recall slices are injected.
  */
 export declare function renderSnapshot(store: MaestroMemoryStore, ctx: SnapshotContext, opts?: SnapshotRenderOpts): string;
 //# sourceMappingURL=snapshot.d.ts.map

@@ -44,6 +44,7 @@ import {
   BRANCH_TAG_RE,
   SUMMARY_TAG_RE,
 } from '../storage/legacy-format.ts'
+import { desensitize } from './sanitize.ts'
 
 export type MemoryTarget = 'memory' | 'global' | 'user' | 'project' | 'key' | 'daily'
 export type MemoryAction = 'add' | 'list' | 'replace' | 'remove' | 'archive' | 'expand'
@@ -357,12 +358,12 @@ export class MaestroMemoryStore {
     return out
   }
 
-  /** Add entry (with optional branches/summary for key) — hardened: auto date + auto summary */
+  /** Add entry (with optional branches/summary for key) — hardened: auto date + auto summary + desensitize */
   add(
     target: MemoryTarget,
     entry: string,
     cwd?: string,
-    opts: { branches?: string; summary?: string; date?: string } = {},
+    opts: { branches?: string; summary?: string; date?: string; desensitize?: boolean } = {},
   ): { ok: true; duplicate?: boolean; id?: string } | { ok: false; error: string } {
     try {
       this.assertNotBlocked()
@@ -372,6 +373,13 @@ export class MaestroMemoryStore {
     const t = normalizeTarget(target)
     let content = String(entry ?? '').trim()
     if (!content) return { ok: false, error: 'empty content' }
+    // Desensitize by default (opt-out via {desensitize:false} for tests/internal)
+    const doDesensitize = opts.desensitize !== false
+    if (doDesensitize) {
+      const s = desensitize(content)
+      if (s === null) return { ok: false, error: 'content filtered (sensitive-only)' }
+      content = s
+    }
     // Auto date prefix for all tracks (local calendar, preserves existing [id:/date/branch/time)
     content = this.ensureDatePrefix(content)
     // For key, handle branches and summary before id generation, then auto summary if still missing

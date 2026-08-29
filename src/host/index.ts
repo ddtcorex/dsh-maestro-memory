@@ -15,17 +15,26 @@ import { SyncService } from './sync/service.ts'
 import { RealGitAdapter } from './sync/git.ts'
 import { listSkillsSync, resolveDefaultMaestroSkillsDir } from './skills-browser.ts'
 import { renderSnapshot } from './prompt/snapshot.ts'
+import { installAutoMemoryHooks, DEFAULT_AUTO_MEMORY, type AutoMemoryOptions } from './auto-memory.ts'
+import { computeFiveDim } from './health-score.ts'
 
 export const inject = ['tools', 'systemPrompt', 'connection'] as const
 
 export interface MaestroMemoryConfig {
   memoryDir?: string | null
   snapshotOrder?: number
+  autoMemory?: Partial<AutoMemoryOptions>
 }
 
 export const DEFAULTS: Required<MaestroMemoryConfig> = {
   memoryDir: null,
   snapshotOrder: 500,
+  autoMemory: { ...DEFAULT_AUTO_MEMORY },
+}
+
+export const READ_ACTIONS = new Set(['list', 'expand'])
+export function isMemoryConcurrencySafe(args: any): boolean {
+  return READ_ACTIONS.has(String(args?.action ?? ''))
 }
 
 // Extended unions for memory tool (M2-PR-A + M2-PR-B queue)
@@ -48,6 +57,15 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
   const root = resolveMemoryRoot(config.memoryDir ?? null)
   const queue = new SuggestionQueue(suggestionsPath(root))
   const syncService = new SyncService(config.memoryDir ?? null, new RealGitAdapter())
+
+  // Auto-memory (opt-in, default disabled) — session/event → store
+  ctx.effect(() => {
+    const am: AutoMemoryOptions = { ...DEFAULT_AUTO_MEMORY, ...(config.autoMemory ?? {}) }
+    const dispose = installAutoMemoryHooks(ctx, store, am)
+    return () => {
+      if (typeof dispose === 'function') dispose()
+    }
+  }, 'maestro-memory: auto-memory')
 
   ctx.effect(() => {
     const dispose = ctx.systemPrompt.context({
@@ -98,7 +116,9 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
         date: { type: 'string', description: 'Date YYYY-MM-DD for daily track (add/list/replace/remove)' },
       },
       output: CONTENT_OUTPUT,
+      isConcurrencySafe: (args: any) => isMemoryConcurrencySafe(args),
       execute: async (args: any, exec: any) => {
+        if (exec?.signal?.aborted) throw new Error('memory aborted')
         const target = args.target as MemoryTarget
         const action = args.action as MemoryAction
         const cwd: string | undefined = args.cwd ?? exec?.agent?.session?.header?.cwd
@@ -199,6 +219,7 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
     const tool = defineTool({
       name: 'memory_suggest',
       description: 'Propose memory/todo for confirmation queue (gated, requires user approve). Targets: memory/user/key/todo-*',
+      isConcurrencySafe: () => false,
       parameters: {
         target: { type: 'string', required: true, enum: ['memory', 'user', 'key', 'todo-life', 'todo-work', 'todo-project', 'todo-daily'] },
         content: { type: 'string', required: true },
@@ -206,6 +227,7 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
       },
       output: CONTENT_OUTPUT,
       execute: async (args: any, exec: any) => {
+        if (exec?.signal?.aborted) throw new Error('memory_suggest aborted')
         const target = String(args.target ?? '').trim()
         const content = String(args.content ?? '').trim()
         const reason = String(args.reason ?? '').trim()
@@ -230,6 +252,7 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
   ctx.effect(() => {
     const tool = defineTool({
       name: 'dtodo',
+      isConcurrencySafe: (args: any) => String(args?.action ?? '') === 'list',
       description: 'Todos: life/work/project/daily with IDs, status/due/quadrant, smart view (overdue/today/project/Q1-Q2, limit 8), historical daily lookup',
       parameters: {
         action: { type: 'string', required: true, enum: ['add', 'list', 'done', 'update', 'remove'] },
@@ -250,6 +273,7 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
       },
       output: CONTENT_OUTPUT,
       execute: async (args: any, exec: any) => {
+        if (exec?.signal?.aborted) throw new Error('dtodo aborted')
         const action = args.action as string
         const cwd: string | undefined = args.cwd ?? exec?.agent?.session?.header?.cwd
         const dateArg = (v: any) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined)
@@ -625,7 +649,16 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
           } catch { dailyCounts.push(0) }
         }
         const longest = [...projectEntries].sort((a, b) => b.length - a.length).slice(0, 5).map((e) => ({ len: e.length, preview: e.slice(0, 80).replace(/\n/g, ' ') }))
-        const health = { project: { total, withSummary, coverage }, daily: { counts: dailyCounts }, longest }
+        const fiveDim = computeFiveDim({
+          projectTotal: total,
+          withSummary,
+          dailyCounts,
+          longestLen: longest[0]?.len ?? 0,
+          hasAutoRecall: true,
+          hasSanitize: true,
+          hasGatedQueue: true,
+        })
+        const health = { project: { total, withSummary, coverage }, daily: { counts: dailyCounts }, longest, fiveDim }
         return { ok: true, value: health }
       } catch (e: any) {
         return { ok: false, error: e?.message ?? String(e) }
