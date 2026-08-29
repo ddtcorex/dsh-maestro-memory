@@ -25,10 +25,12 @@ export declare class MaestroMemoryStore {
     private applyBranchTag;
     private applySummaryTag;
     private ensureId;
+    private ensureDatePrefix;
+    private ensureAutoSummary;
     /** List entries with optional query filters */
     list(target: MemoryTarget, cwd?: string, opts?: ListOpts): string[];
     private filterEntries;
-    /** Add entry (with optional branches/summary for key) */
+    /** Add entry (with optional branches/summary for key) — hardened: auto date + auto summary */
     add(target: MemoryTarget, entry: string, cwd?: string, opts?: {
         branches?: string;
         summary?: string;

@@ -32,6 +32,7 @@ import {
   globalArchivePath,
   userArchivePath,
   projectKeyArchivePath,
+  projectArchivePath,
   maestroMetaDir,
 } from '../storage/layout.ts'
 import {
@@ -41,6 +42,7 @@ import {
   autoSummary,
   extractEntryDate,
   BRANCH_TAG_RE,
+  SUMMARY_TAG_RE,
 } from '../storage/legacy-format.ts'
 
 export type MemoryTarget = 'memory' | 'global' | 'user' | 'project' | 'key' | 'daily'
@@ -144,7 +146,11 @@ export class MaestroMemoryStore {
       if (!cwd) throw new Error('key archive requires cwd')
       return projectKeyArchivePath(r, cwd)
     }
-    throw new Error(`archive only for memory/user/key (got ${target})`)
+    if (t === 'project') {
+      if (!cwd) throw new Error('project archive requires cwd')
+      return projectArchivePath(r, cwd)
+    }
+    throw new Error(`archive only for memory/user/key/project (got ${target})`)
   }
 
   // -------------------------------------------------------------------------
@@ -230,6 +236,22 @@ export class MaestroMemoryStore {
   private ensureId(entry: string): string {
     if (/^\[id:\s*[0-9a-f]{8}\]\s*/i.test(entry)) return entry
     return `[id:${genId()}] ${entry}`
+  }
+
+  private ensureDatePrefix(entry: string): string {
+    const t = String(entry).trim()
+    if (/^\[(?:\d{4}-\d{2}-\d{2}|id:\s*[0-9a-f]{8}|branch:)/i.test(t)) return t
+    // daily entries often have [HH:MM] — keep if present (but we still want date for non-daily)
+    if (/^\[\d{1,2}:\d{2}(?::\d{2})?\]/.test(t)) return t
+    return `[${todayStamp()} ${timeStamp()}] ${t}`
+  }
+
+  private ensureAutoSummary(entry: string, target: MemoryTarget): string {
+    if (target === 'daily') return entry
+    if (SUMMARY_TAG_RE.test(entry)) return entry
+    const s = autoSummary(entry, 80).replace(/[\n\r\t\]]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120)
+    if (!s) return entry
+    return `${entry.trimEnd()} [summary:${s}]`
   }
 
   // -------------------------------------------------------------------------
@@ -335,7 +357,7 @@ export class MaestroMemoryStore {
     return out
   }
 
-  /** Add entry (with optional branches/summary for key) */
+  /** Add entry (with optional branches/summary for key) — hardened: auto date + auto summary */
   add(
     target: MemoryTarget,
     entry: string,
@@ -350,20 +372,34 @@ export class MaestroMemoryStore {
     const t = normalizeTarget(target)
     let content = String(entry ?? '').trim()
     if (!content) return { ok: false, error: 'empty content' }
-    // For key, handle branches and summary before id generation
+    // Auto date prefix for all tracks (local calendar, preserves existing [id:/date/branch/time)
+    content = this.ensureDatePrefix(content)
+    // For key, handle branches and summary before id generation, then auto summary if still missing
     if (t === 'key') {
       if (opts.branches) content = this.applyBranchTag(content, opts.branches)
       if (opts.summary) {
         content = this.applySummaryTag(content, opts.summary)
       }
       content = this.ensureId(content)
+      content = this.ensureAutoSummary(content, t)
+    } else {
+      content = this.ensureAutoSummary(content, t)
     }
-    // For daily/project, strip hand-written date prefix? Keep simple: no stamping, store verbatim
     let file: string
     try {
       file = this.fileFor(t, cwd, opts.date)
     } catch (e: any) {
       return { ok: false, error: e?.message ?? String(e) }
+    }
+    // Dedupe with stripped id+summary so summary difference doesn't create duplicate
+    try {
+      const existing = readEntriesSync(file)
+      const stripForDedupe = (s: string) => s.replace(/\[summary:[^\]]*\]\s*/g, '').replace(/^\[id:\s*[0-9a-f]{8}\]\s*/i, '').trim()
+      const probe = stripForDedupe(content)
+      const isDup = existing.some((e) => stripForDedupe(e) === probe)
+      if (isDup) return { ok: true, duplicate: true }
+    } catch {
+      // read failure → treat as no duplicate, let append handle it
     }
     const res = appendEntryAtomicSync(file, content)
     if (!res.ok) return { ok: false, error: res.error }
@@ -409,13 +445,14 @@ export class MaestroMemoryStore {
       let replacement = newText
       const oldEntry = matches[0]
       const oldId = /^\[id:\s*([0-9a-f]{8})\]\s*/i.exec(oldEntry)?.[1]
-      // If replacement already has summary handling? Not for replace; keep simple
       if (oldId) {
         // If replacement doesn't already have id, prepend it
         if (!/^\[id:\s*[0-9a-f]{8}\]\s*/i.test(replacement)) {
           replacement = `[id:${oldId.toLowerCase()}] ${replacement}`
         }
       }
+      replacement = this.ensureDatePrefix(replacement)
+      replacement = this.ensureAutoSummary(replacement, t)
       const idx = entries.indexOf(oldEntry)
       const next = [...entries]
       next[idx] = replacement
@@ -473,12 +510,17 @@ export class MaestroMemoryStore {
       return { ok: false, error: e?.message ?? String(e) }
     }
     const t = normalizeTarget(target)
-    if (t !== 'memory' && t !== 'user' && t !== 'key') {
-      return { ok: false, error: 'archive only for memory/user/key' }
+    if (t !== 'memory' && t !== 'user' && t !== 'key' && t !== 'project') {
+      return { ok: false, error: 'archive only for memory/user/key/project' }
     }
     const m = String(match ?? '').trim()
     if (!m) return { ok: false, error: 'empty match' }
-    const mainFile = this.fileFor(t, cwd)
+    let mainFile: string
+    try {
+      mainFile = this.fileFor(t, cwd)
+    } catch (e: any) {
+      return { ok: false, error: e?.message ?? String(e) }
+    }
     return withLockSync(dirname(mainFile), () => {
       const entries = readEntriesSync(mainFile)
       const matches = entries.filter((e) => e.includes(m))
@@ -620,7 +662,11 @@ export class MaestroArchiveStore {
       if (!cwd) throw new Error('key archive requires cwd')
       return projectKeyArchivePath(r, cwd)
     }
-    throw new Error(`archive only for memory/user/key`)
+    if (t === 'project') {
+      if (!cwd) throw new Error('project archive requires cwd')
+      return projectArchivePath(r, cwd)
+    }
+    throw new Error(`archive only for memory/user/key/project`)
   }
 
   entries(target: MemoryTarget, cwd?: string): string[] {
