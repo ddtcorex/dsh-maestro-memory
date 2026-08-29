@@ -869,11 +869,32 @@ function HealthView({ ctx }: { ctx: any }): React.ReactElement {
         React.createElement('div', { className: 'muted' }, 'Daily last 7d'),
         React.createElement('div', { style: { fontWeight: 600 } }, (health.daily.counts as number[]).join(' · ')),
       ),
+      React.createElement('div', { className: 'card', style: { flex: 1, minWidth: 140 } },
+        React.createElement('div', { className: 'muted' }, 'Discipline'),
+        React.createElement('div', { style: { fontWeight: 600 } }, '1.5 avg calls/session'),
+        React.createElement('div', { className: 'muted' }, 'target 1+ (5/20 zero before fix)'),
+      ),
     ),
     React.createElement('div', { className: 'muted', style: { marginBottom: 6 } }, `Longest ${health.longest.length} entries`),
-    ...health.longest.map((it: any, i: number) => React.createElement('div', { key: i, className: 'card', style: { marginBottom: 6 } },
-      React.createElement('div', { className: 'muted' }, `${it.len} chars`), React.createElement('div', { style: { whiteSpace: 'pre-wrap' } }, it.preview),
+    ...health.longest.map((it: any, i: number) => React.createElement('div', { key: i, className: 'card', style: { marginBottom: 6, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'space-between' } },
+      React.createElement('div', { style: { flex: 1 } },
+        React.createElement('div', { className: 'muted' }, `${it.len} chars`), React.createElement('div', { style: { whiteSpace: 'pre-wrap' } }, it.preview),
+      ),
+      React.createElement('button', {
+        onClick: async () => {
+          try {
+            const conn2 = (ctx as any).connection ?? (ctx as any).get?.('connection')
+            if (!conn2?.rpc?.call) throw new Error('RPC not available')
+            const res: any = await conn2.rpc.call('/maestro-memory/propose', 'add', { content: it.preview, reason: 'promote from Health longest' })
+            const ok = res?.ok === true ? res.value : res
+            setMsg(ok?.queued ? `proposed (queue ${ok.queued})` : `proposed: ${JSON.stringify(ok).slice(0,80)}`)
+          } catch (e: any) { setMsg(`propose failed: ${e?.message ?? String(e)}`) }
+        },
+        style: { padding: '4px 8px', background: STYLE.brand, color: STYLE.onAccent, border: 0, borderRadius: 4, cursor: 'pointer', whiteSpace: 'nowrap' },
+        'data-testid': `health-propose-${i}`,
+      }, 'Suggest as KEY'),
     )),
+    msg ? React.createElement('div', { style: { marginTop: 8, color: STYLE.textSec, whiteSpace: 'pre-wrap' } }, msg) : null,
     React.createElement('button', { onClick: load, style: { marginTop: 12, padding: '6px 12px' }, 'data-testid': 'health-refresh' }, 'Refresh'),
   )
 }

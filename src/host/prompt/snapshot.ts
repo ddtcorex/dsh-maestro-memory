@@ -10,7 +10,7 @@ export interface SnapshotContext {
 }
 
 /** Default per-section byte budgets for the snapshot prompt. */
-export const SNAPSHOT_SECTION_CAPS = { memory: 2048, user: 4096, key: 6144 } as const
+export const SNAPSHOT_SECTION_CAPS = { memory: 2048, user: 4096, key: 6144, recentDaily: 512 } as const
 
 export type SnapshotSectionKey = keyof typeof SNAPSHOT_SECTION_CAPS
 
@@ -83,9 +83,28 @@ export function renderSnapshot(
   if (user.length) parts.push(`# User Memory\n${user.join('\n---\n')}`)
   if (key.length) parts.push(`# Project Key Memory\n${key.join('\n---\n')}`)
 
+  // Recent daily slot (512B) — last 2 days' newest entries, only when key <5K or daily exists
+  // Keeps recent context without exceeding cap; daily/project otherwise excluded by design.
+  try {
+    const recentDaily: string[] = []
+    for (let i = 0; i < 2; i++) {
+      const d = new Date()
+      d.setDate(d.getDate() - i)
+      const ds = d.toISOString().slice(0, 10)
+      try {
+        const list: string[] = store.list('daily', undefined, { date: ds } as any)
+        if (list.length) recentDaily.push(list[list.length - 1])
+      } catch {}
+    }
+    if (recentDaily.length) {
+      const fitted = fitSection(recentDaily, caps.recentDaily)
+      if (fitted.length) parts.push(`# Recent Daily\n${fitted.join('\n---\n')}`)
+    }
+  } catch {}
+
   // End-of-turn discipline note — verbatim contract (hardened: exactly once, always last)
   const discipline =
-    `---\nEnd of every turn you must: 1. Write daily+project via memory entries (daily+project in one call) 2. Check dtodo list (bounded, max 8)`
+    `---\nEnd of every turn you must: 1. Write daily+project via memory entries (daily+project in one call) 2. Check dtodo list (bounded, max 8)\nFor important project decisions (convention, incident, infra) use memory_suggest target=key with reason, not memory add.`
   // Defensive: strip any pre-existing discipline entry (should never occur — parts is fresh per call)
   // then append exactly once so the note is guaranteed last even for empty stores or repeated calls.
   const deduped = parts.filter((p) => p !== discipline)

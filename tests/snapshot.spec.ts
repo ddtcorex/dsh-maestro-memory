@@ -27,7 +27,7 @@ describe('renderSnapshot contract', () => {
     expect(text).toMatch(/dtodo list/i)
   })
 
-  it('bounded: includes USER+MEMORY+KEY, excludes daily/project', () => {
+  it('bounded: includes USER+MEMORY+KEY, excludes project, recent daily (512B) may include daily', () => {
     store.add('memory', '[2026-08-10] global')
     store.add('user', '[2026-08-10] user')
     store.add('key', '[2026-08-10] key entry', cwd)
@@ -37,8 +37,11 @@ describe('renderSnapshot contract', () => {
     expect(text).toContain('global')
     expect(text).toContain('user')
     expect(text).toContain('key entry')
-    expect(text).not.toContain('daily log')
+    // project never injected; daily only via Recent Daily 512B slot (not as main section)
     expect(text).not.toContain('project log')
+    // recent daily: if today's daily exists, it appears under Recent Daily
+    expect(text).toContain('Recent Daily')
+    expect(text).toContain('daily log')
   })
 
   it('branch-filtered: only matching key entries appear', () => {
