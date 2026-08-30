@@ -4,6 +4,13 @@ All notable changes to this project are documented in this file. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.2] - 2026-08-30
+
+### Fixed
+
+- **Memory tab overlay bleed (2)** — add `contain: paint` + `overflow:hidden` to `[class*="viewArea"]`/`[data-slot="conversation.view"]`/`[data-slot="conversation.session"]` and `.memx`, force `.memx` `background !important` + `z-index:2`, `pointer-events:auto`, `overflow-x:clip`/`overflow-y:auto` so hover no longer leaks to chat/composer/widthHandle behind.
+- **Mobile tab content overlap** — `.memx` now `box-sizing:border-box` + `max-width:100%`/`overflow-wrap`, `.memx-layout`/`memx-panel`/`memx-grid`/`memx-card`/`memx-form` all `min-width:0` + `max-width:100%`, `grid-template-columns:200px minmax(0,1fr)`, `formrow` flex `1 1 0`, mobile `@1023px` forces `1fr` + `min-width:0`, `@480px` stacks `memx-field`. Fixes right-side overlap on 375px (verify 268/268 green).
+
 ## [1.2.1] - 2026-08-30
 
 ### Fixed
