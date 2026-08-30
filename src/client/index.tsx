@@ -30,12 +30,15 @@ const RPC_CHANNEL = '/dsh-maestro-memory'
 // ───────────────────────────────────────────────────────────────────
 
 const MEM_CSS = `
+/* overlay isolation — Memory tab must fully cover chat behind (opaque + stacking) */
+[data-slot="conversation.view"] { background: var(--dsw-alias-bg-base); isolation: isolate; }
+[data-slot="conversation.view"] > .memx { flex: 1 1 auto; }
 /* legacy contract for tests — inheritance via .dshmem */
 .dshmem { color: var(--dsw-alias-label-primary); font-size: 13px; }
 .dshmem button { font: inherit; cursor: pointer; transition: color .15s ease, background .15s ease, border-color .15s ease, opacity .15s ease; }
 .dshmem button:focus-visible { outline: 2px solid var(--dsw-alias-interactive-bg-active); outline-offset: 1px; }
 .dshmem input, .dshmem textarea, .dshmem select { font: inherit; color: var(--dsw-alias-label-primary); background: var(--dsw-alias-bg-layer-2); border: 1px solid var(--dsw-alias-border-l1); border-radius: 8px; }
-.memx { color: var(--dsw-alias-label-primary); font-size: 13px; line-height: 1.5; }
+.memx { color: var(--dsw-alias-label-primary); font-size: 13px; line-height: 1.5; background: var(--dsw-alias-bg-base); position: relative; z-index: 1; isolation: isolate; min-height: 100%; width: 100%; align-self: stretch; flex: 1 1 auto; pointer-events: auto; }
 .memx * { box-sizing: border-box; }
 .memx button { font: inherit; cursor: pointer; transition: color .15s ease, background .15s ease, border-color .15s ease, opacity .15s ease; }
 .memx button:active { transform: translateY(.5px); }
@@ -525,7 +528,7 @@ function MemoryView({ ctx }: {ctx:any}): React.ReactElement {
     {id:'health', label:'Health', icon:ICO.activity},
   ]
 
-  return React.createElement('div',{className:'dshmem memx', style:{padding:'12px 12px 16px'}},
+  return React.createElement('div',{className:'dshmem memx', style:{padding:'12px 12px 16px', background:'var(--dsw-alias-bg-base)', position:'relative', zIndex:1, isolation:'isolate' as any, minHeight:'100%', width:'100%'} as any},
     React.createElement('style',null, MEM_CSS),
     React.createElement('div',{className:'memx-header'},
       React.createElement('div',{className:'memx-header-main'},

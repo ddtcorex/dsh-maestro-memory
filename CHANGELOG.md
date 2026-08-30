@@ -4,6 +4,12 @@ All notable changes to this project are documented in this file. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] - 2026-08-30
+
+### Fixed
+
+- **Memory tab overlay bleed** — `conversation.view` content now fully opaque over chat. `.memx` gets `background: var(--dsw-alias-bg-base)`, `isolation: isolate`, `z-index:1`, `min-height:100%` + `flex:1`, parent `[data-slot="conversation.view"]` forced opaque; inline `style` also carries bg/isolation to cover slot gaps that leaked chat hover effects.
+
 ## [1.2.0] - 2026-08-29
 
 ### Added
