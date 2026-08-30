@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   release:
-    uses: ddtcorex/dsh-maestro-ci/.github/workflows/node-release.yml@22511d64e0dec4e5926388848a347973ec2e3b12
+    uses: ddtcorex/dsh-maestro-ci/.github/workflows/node-release.yml@e2448b1e7c167c6d969c8d369fef1bc2a8f0271a
     with:
       pnpm-version: ""
     secrets:
