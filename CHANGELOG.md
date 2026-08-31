@@ -4,6 +4,12 @@ All notable changes to this project are documented in this file. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.3] - 2026-08-31
+
+### Fixed
+
+- **Memory tab overlay bleed (3)** — `viewArea` bumped to `z-index:9` and `widthHandle` (`z-index:8`) hidden via `:has(.memx) {display:none}` + JS fallback on mount/unmount so Memory fully covers chat transcript; hover glow no longer bleeds through. Keeps flex layout so composer remains visible below. Verify 268/268 green.
+
 ## [1.2.2] - 2026-08-30
 
 ### Fixed
