@@ -363,7 +363,15 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
             const targetsRaw = payload?.targets as Record<string, string> | undefined
             const edits = editsRaw ? new Map(Object.entries(editsRaw).map(([k, v]) => [Number(k), String(v)])) : undefined
             const targets = targetsRaw ? new Map(Object.entries(targetsRaw).map(([k, v]) => [Number(k), String(v)])) : undefined
-            const agent = payload?.cwd ? { session: { header: { cwd: payload.cwd } } } : undefined
+            let agent: any = payload?.cwd ? { session: { header: { cwd: String(payload.cwd) } } } : undefined
+            if (!agent) {
+              try {
+                const snap: any = (ctx as any).sessions?.list?.getSnapshot?.() ?? (ctx as any).get?.('sessions')?.list?.getSnapshot?.()
+                const cur = snap?.current as string | undefined
+                const cwd = cur ? (snap?.byId?.[cur]?.cwd as string | undefined) : undefined
+                if (cwd) agent = { session: { header: { cwd } } }
+              } catch {}
+            }
             const res = approveSuggestions(store, todoStore, queue, indices, agent, edits, targets)
             return { ok: true, ...res }
           }
@@ -683,7 +691,16 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
         const reason = String(payload?.reason ?? 'promote from Health longest').trim()
         if (!content) return { ok: false, error: 'empty content' }
         if (!reason) return { ok: false, error: 'empty reason' }
-        const res = enqueueSuggestion(queue, 'key', content, reason, undefined as any)
+        const payloadCwd = typeof payload?.cwd === 'string' ? payload.cwd.trim() : ''
+        let sessionCwd: string | null = null
+        try {
+          const snap: any = (ctx as any).sessions?.list?.getSnapshot?.() ?? (ctx as any).get?.('sessions')?.list?.getSnapshot?.()
+          const cur = snap?.current as string | undefined
+          sessionCwd = cur ? (snap?.byId?.[cur]?.cwd as string | undefined) ?? null : null
+        } catch {}
+        const cwd = payloadCwd || sessionCwd || null
+        const agent: any = cwd ? { session: { header: { cwd } }, id: (ctx as any).sessionId ?? null } : undefined
+        const res = enqueueSuggestion(queue, 'key', content, reason, agent)
         if (!res.ok) return { ok: false, error: (res as any).message ?? 'failed' }
         return { ok: true, value: res }
       } catch (e: any) {

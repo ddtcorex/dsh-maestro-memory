@@ -214,9 +214,12 @@ function ReviewQueueView({ ctx, onPendingChange }: { ctx:any; onPendingChange?:(
     setMsg('')
     const payload:any={ action, indices:[index] }
     if(action==='approve' && edits[index]!==undefined && edits[index].trim()!=='') payload.edits={ [String(index)]: edits[index] }
+    if(action==='approve'){
+      try { const snap:any=(ctx as any)?.sessions?.list?.getSnapshot?.(); const cur=snap?.current as string|undefined; const cwd = cur ? (snap?.byId?.[cur]?.cwd as string) ?? '' : ''; if(cwd) payload.cwd = cwd } catch {}
+    }
     try{ const res:any=await rpc('queue.decide',payload); if(res?.ok){ setMsg(res.lines?res.lines.join('; '):`${action} ok`); await load() } else setMsg(`failed: ${res?.error??'unknown'}`) }
     catch(e:any){ setMsg(`error: ${e?.message??String(e)}`) }
-  },[rpc,edits,load])
+  },[rpc,edits,load,ctx])
 
   const filtered = React.useMemo(()=>{
     const t=q.trim().toLowerCase(); if(!t) return entries
@@ -498,8 +501,8 @@ function HealthView({ ctx }: {ctx:any}): React.ReactElement {
   },[ctx])
   React.useEffect(()=>{ load() },[load])
   if(loading) return React.createElement('div',{className:'memx-muted'},'Loading health…')
-  if(msg) return React.createElement('div',null, React.createElement('div',{style:{color:'var(--dsw-alias-state-error-primary)'}},msg), React.createElement('button',{onClick:load, className:'memx-btn', style:{marginTop:8}},'Retry'))
-  if(!health) return React.createElement('div',{className:'memx-muted'},'No data')
+  if(msg && !health) return React.createElement('div',null, React.createElement('div',{style:{color:'var(--dsw-alias-state-error-primary)'}},msg), React.createElement('button',{onClick:load, className:'memx-btn', style:{marginTop:8}},'Retry'))
+  if(!health) return React.createElement('div',null, msg ? React.createElement('div',{style:{color:'var(--dsw-alias-state-error-primary)', marginBottom:8}},msg) : null, React.createElement('div',{className:'memx-muted'},'No data'), React.createElement('button',{onClick:load, className:'memx-btn', style:{marginTop:8}},'Retry'))
   const cov=health.project.coverage as number
   const covColor = cov>=90 ? 'var(--dsw-alias-state-success-primary)' : cov>=50 ? 'var(--dsw-alias-state-warn-primary)' : 'var(--dsw-alias-state-error-primary)'
   return React.createElement('div',{className:'memx-panel'},
@@ -526,7 +529,9 @@ function HealthView({ ctx }: {ctx:any}): React.ReactElement {
         React.createElement('button',{onClick: async()=>{
           try{
             const conn2=(ctx as any).connection ?? (ctx as any).get?.('connection'); if(!conn2?.rpc?.call) throw new Error('RPC not available')
-            const res:any=await conn2.rpc.call('/dsh-maestro-memory-propose','add',{content:it.preview, reason:'promote from Health longest'}); const ok=res?.ok===true?res.value:res; setMsg(ok?.queued?`proposed (queue ${ok.queued})`:`proposed: ${JSON.stringify(ok).slice(0,80)}`)
+            let cwd = ''
+            try { const snap:any=(ctx as any)?.sessions?.list?.getSnapshot?.(); const cur=snap?.current as string|undefined; cwd = cur ? (snap?.byId?.[cur]?.cwd as string) ?? '' : '' } catch {}
+            const res:any=await conn2.rpc.call('/dsh-maestro-memory-propose','add',{content:it.preview, reason:'promote from Health longest', cwd}); const ok=res?.ok===true?res.value:res; setMsg(ok?.queued?`proposed (queue ${ok.queued})`:`proposed: ${JSON.stringify(ok).slice(0,80)}`)
           } catch(e:any){ setMsg(`propose failed: ${e?.message??String(e)}`) }
         }, className:'memx-btn memx-btn-primary', 'data-testid':`health-propose-${i}`, style:{whiteSpace:'nowrap', flex:'none'}}, 'Suggest as KEY'),
       )),
