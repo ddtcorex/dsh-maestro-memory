@@ -4,6 +4,13 @@ All notable changes to this project are documented in this file. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.4] - 2026-09-02
+
+### Fixed
+
+- **Auto scroll** — prevent auto scroll down when clicking Memory tab (#37).
+
+
 ## [1.2.3] - 2026-08-31
 
 ### Fixed
