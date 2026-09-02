@@ -424,6 +424,29 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
           }
           return { ok: false, error: `unknown action ${action}` }
         }
+        case 'queue.propose': {
+          try {
+            const content = String(payload?.content ?? '').trim()
+            const reason = String(payload?.reason ?? 'promote from Health longest').trim()
+            if (!content) return { ok: false, error: 'empty content' }
+            if (!reason) return { ok: false, error: 'empty reason' }
+            const payloadCwd = typeof payload?.cwd === 'string' ? payload.cwd.trim() : ''
+            let cwd: string | null = payloadCwd || null
+            if (!cwd) {
+              try {
+                const snap: any = (ctx as any).sessions?.list?.getSnapshot?.() ?? (ctx as any).get?.('sessions')?.list?.getSnapshot?.()
+                const cur = snap?.current as string | undefined
+                cwd = cur ? (snap?.byId?.[cur]?.cwd as string | undefined) ?? null : null
+              } catch {}
+            }
+            const agent: any = cwd ? { session: { header: { cwd } }, id: (ctx as any).sessionId ?? null } : undefined
+            const res = enqueueSuggestion(queue, 'key', content, reason, agent)
+            if (!res.ok) return { ok: false, error: (res as any).message ?? 'failed' }
+            return res as any
+          } catch (e: any) {
+            return { ok: false, error: e?.message ?? String(e) }
+          }
+        }
         case 'memory.list': {
           const target = payload?.target as string
           const cwd = payload?.cwd as string | undefined

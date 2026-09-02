@@ -485,6 +485,7 @@ function MemoryListView({ ctx }: {ctx:any}): React.ReactElement {
 
 // ── Health ─────────────────────────────────────────────────────────
 function HealthView({ ctx }: {ctx:any}): React.ReactElement {
+  const rpc = useRpc(ctx)
   const [health,setHealth]=React.useState<any>(null)
   const [loading,setLoading]=React.useState(true)
   const [msg,setMsg]=React.useState('')
@@ -528,10 +529,9 @@ function HealthView({ ctx }: {ctx:any}): React.ReactElement {
         React.createElement('div',{style:{flex:1, minWidth:0}}, React.createElement('div',{className:'memx-xs'}, `${it.len} chars`), React.createElement('div',{className:'memx-pre-sm'}, it.preview)),
         React.createElement('button',{onClick: async()=>{
           try{
-            const conn2=(ctx as any).connection ?? (ctx as any).get?.('connection'); if(!conn2?.rpc?.call) throw new Error('RPC not available')
             let cwd = ''
             try { const snap:any=(ctx as any)?.sessions?.list?.getSnapshot?.(); const cur=snap?.current as string|undefined; cwd = cur ? (snap?.byId?.[cur]?.cwd as string) ?? '' : '' } catch {}
-            const res:any=await conn2.rpc.call('/dsh-maestro-memory-propose','add',{content:it.preview, reason:'promote from Health longest', cwd}); const ok=res?.ok===true?res.value:res; setMsg(ok?.queued?`proposed (queue ${ok.queued})`:`proposed: ${JSON.stringify(ok).slice(0,80)}`)
+            const res:any=await rpc('queue.propose',{content:it.preview, reason:'promote from Health longest', cwd}); setMsg(res?.queued?`proposed (queue ${res.queued})`:`proposed: ${JSON.stringify(res).slice(0,80)}`)
           } catch(e:any){ setMsg(`propose failed: ${e?.message??String(e)}`) }
         }, className:'memx-btn memx-btn-primary', 'data-testid':`health-propose-${i}`, style:{whiteSpace:'nowrap', flex:'none'}}, 'Suggest as KEY'),
       )),
