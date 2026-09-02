@@ -18,7 +18,7 @@ import { renderSnapshot } from './prompt/snapshot.ts'
 import { installAutoMemoryHooks, DEFAULT_AUTO_MEMORY, type AutoMemoryOptions } from './auto-memory.ts'
 import { computeFiveDim } from './health-score.ts'
 
-export const inject = ['tools', 'systemPrompt', 'connection'] as const
+export const inject = ['tools', 'systemPrompt', 'connection', 'sessions'] as const
 
 export interface MaestroMemoryConfig {
   memoryDir?: string | null
@@ -431,15 +431,8 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
             if (!content) return { ok: false, error: 'empty content' }
             if (!reason) return { ok: false, error: 'empty reason' }
             const payloadCwd = typeof payload?.cwd === 'string' ? payload.cwd.trim() : ''
-            let cwd: string | null = payloadCwd || null
-            if (!cwd) {
-              try {
-                const snap: any = (ctx as any).sessions?.list?.getSnapshot?.() ?? (ctx as any).get?.('sessions')?.list?.getSnapshot?.()
-                const cur = snap?.current as string | undefined
-                cwd = cur ? (snap?.byId?.[cur]?.cwd as string | undefined) ?? null : null
-              } catch {}
-            }
-            const agent: any = cwd ? { session: { header: { cwd } }, id: (ctx as any).sessionId ?? null } : undefined
+            const cwd: string | null = payloadCwd || null
+            const agent: any = cwd ? { session: { header: { cwd } } } : undefined
             const res = enqueueSuggestion(queue, 'key', content, reason, agent)
             if (!res.ok) return { ok: false, error: (res as any).message ?? 'failed' }
             return res as any
@@ -722,7 +715,7 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
           sessionCwd = cur ? (snap?.byId?.[cur]?.cwd as string | undefined) ?? null : null
         } catch {}
         const cwd = payloadCwd || sessionCwd || null
-        const agent: any = cwd ? { session: { header: { cwd } }, id: (ctx as any).sessionId ?? null } : undefined
+        const agent: any = cwd ? { session: { header: { cwd } } } : undefined
         const res = enqueueSuggestion(queue, 'key', content, reason, agent)
         if (!res.ok) return { ok: false, error: (res as any).message ?? 'failed' }
         return { ok: true, value: res }

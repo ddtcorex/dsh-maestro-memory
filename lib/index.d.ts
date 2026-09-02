@@ -1,5 +1,5 @@
 import { type AutoMemoryOptions } from './auto-memory.ts';
-export declare const inject: readonly ["tools", "systemPrompt", "connection"];
+export declare const inject: readonly ["tools", "systemPrompt", "connection", "sessions"];
 export interface MaestroMemoryConfig {
     memoryDir?: string | null;
     snapshotOrder?: number;
