@@ -2,7 +2,8 @@ import { Buffer } from 'node:buffer'
 import { existsSync, readFileSync } from 'node:fs'
 import type { MaestroMemoryStore } from '../memory/store.ts'
 import { entryHeadPrefix, parseEntrySummary } from '../storage/legacy-format.ts'
-import { projectReferencePath } from '../storage/layout.ts'
+import { projectReferencePath, userMemoryPath } from '../storage/layout.ts'
+import { appendEntryAtomicSync } from '../storage/atomic-store.ts'
 
 export interface SnapshotContext {
   cwd: string | null
@@ -77,7 +78,24 @@ export function renderSnapshot(
 
   // Bounded memory sections — delegate branch filtering to store.list, then enforce byte caps
   const mem = fitSection(store.list('memory'), caps.memory)
-  const user = fitSection(store.list('user'), caps.user)
+  let user = fitSection(store.list('user'), caps.user)
+  // Bootstrap USER.md from session context when missing/empty (no profile file yet)
+  if (user.length === 0 && (ctx.sessionName || ctx.sessionId)) {
+    try {
+      const userFile = userMemoryPath(store.resolveRoot())
+      if (!existsSync(userFile) || readFileSync(userFile, 'utf8').trim() === '') {
+        const stamp = new Date().toISOString().slice(0, 10)
+        const profileLines: string[] = []
+        if (ctx.sessionName) profileLines.push(`Session: ${ctx.sessionName}`)
+        if (ctx.sessionId) profileLines.push(`Session ID: ${ctx.sessionId}`)
+        if (profileLines.length) {
+          const bootEntry = `[${stamp}] ${profileLines.join('; ')}`
+          appendEntryAtomicSync(userFile, bootEntry)
+          user = fitSection(store.list('user'), caps.user)
+        }
+      }
+    } catch {}
+  }
   const key = ctx.cwd
     ? fitSection(store.list('key', ctx.cwd, ctx.branch ? { branch: ctx.branch } : {}), caps.key)
     : []
@@ -134,8 +152,10 @@ export function renderSnapshot(
 
   // End-of-turn discipline note — verbatim contract (hardened: exactly once, always last)
   // Conditional to avoid idle loops: only when turn produced meaningful progress.
+  // Updated 2026-09-05: reality is daily-only (project MEMORY.md stays timeline-log, not entries);
+  // durable decisions go through memory_suggest target=key, not memory add.
   const discipline =
-    `---\nEnd of every turn — if this turn produced meaningful progress (code, decisions, learnings, or next steps): 1. Write daily+project via memory entries (daily+project in one call, skip if idle/waiting or no new information — never write entries containing only 'Idle' or placeholders) 2. Check dtodo list only if relevant (bounded, max 8)\nFor important project decisions (convention, incident, infra) use memory_suggest target=key with reason, not memory add.`
+    `---\nEnd of every turn — if this turn produced meaningful progress (code, decisions, learnings, or next steps): 1. Write daily via memory entries (daily in one call, skip if idle/waiting or no new information — never write entries containing only 'Idle' or placeholders). 2. For important project decisions (convention, incident, infra) use memory_suggest target=key with reason, not memory add. 3. Check dtodo list only if relevant (bounded, max 8).`
   // Defensive: strip any pre-existing discipline entry (should never occur — parts is fresh per call)
   // then append exactly once so the note is guaranteed last even for empty stores or repeated calls.
   const deduped = parts.filter((p) => p !== discipline)

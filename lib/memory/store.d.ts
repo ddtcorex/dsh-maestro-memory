@@ -18,6 +18,8 @@ export interface ListOpts {
 export declare class MaestroMemoryStore {
     private readonly memoryDir;
     constructor(memoryDir?: string | null);
+    /** Public accessor for the resolved memories root (used by snapshot/reference rendering). */
+    resolveRoot(): string;
     private root;
     private assertNotBlocked;
     private fileFor;
@@ -134,6 +136,29 @@ export declare class MaestroMemoryStore {
     }): string;
     /** Snapshot that respects branch filter (same as above, explicit) */
     snapshotForBranch(cwd: string | null, branch?: string): string;
+    /**
+     * Repair malformed KEY.md delimiter.
+     * Reads raw file, splits on flexible delimiter (§\n or \n§\n), re-serializes canonical (\n§\n).
+     * Runs atomically (bypasses drift guard for repair). Returns { ok: true, repaired: count }.
+     */
+    repairKeyDelimiter(cwd: string): {
+        ok: true;
+        repaired: number;
+    } | {
+        ok: false;
+        error: string;
+    };
+    /**
+     * Prune global memory (MEMORY.md) to fit the snapshot byte cap.
+     * Keeps the newest entries that fit 2048 bytes; older overflow is dropped.
+     */
+    pruneGlobalMemory(): {
+        ok: true;
+        removed: number;
+    } | {
+        ok: false;
+        error: string;
+    };
 }
 export declare class MaestroArchiveStore {
     private readonly memoryDir;

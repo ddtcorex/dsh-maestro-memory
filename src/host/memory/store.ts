@@ -7,6 +7,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { join, dirname } from 'node:path'
+import { Buffer } from 'node:buffer'
 import {
   parseEntries,
   serializeEntries,
@@ -708,6 +709,42 @@ export class MaestroMemoryStore {
       return { ok: true, repaired: entries.length }
     })
   }
+
+  /**
+   * Prune global memory (MEMORY.md) to fit the snapshot byte cap.
+   * Keeps the newest entries that fit 2048 bytes; older overflow is dropped.
+   */
+  pruneGlobalMemory(): { ok: true; removed: number } | { ok: false; error: string } {
+    try {
+      this.assertNotBlocked()
+    } catch (e: any) {
+      return { ok: false, error: e?.message ?? String(e) }
+    }
+    const file = this.fileFor('memory')
+    return withLockSync(dirname(file), () => {
+      const entries = readEntriesSync(file)
+      if (entries.length === 0) return { ok: true, removed: 0 }
+      const fitted = fitSection(entries, 2048)
+      if (fitted.length === entries.length) return { ok: true, removed: 0 }
+      const res = writeEntriesAtomicSync(file, fitted)
+      if (!res.ok) return { ok: false, error: res.error }
+      return { ok: true, removed: entries.length - fitted.length }
+    })
+  }
+}
+
+// fitSection must be available before store methods use it; declared in snapshot module but duplicated here for host use
+function fitSection(entries: string[], cap: number): string[] {
+  if (entries.length === 0) return []
+  const keptDesc: string[] = []
+  let used = 0
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const size = Buffer.byteLength(entries[i], 'utf8')
+    if (used + size > cap && keptDesc.length > 0) break
+    keptDesc.push(entries[i])
+    used += size
+  }
+  return keptDesc.reverse()
 }
 
 // Re-export ArchiveStore for direct use (matches legacy)
