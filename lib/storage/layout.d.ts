@@ -20,6 +20,7 @@ export declare function dailyTodoPath(root: string, date: string): string;
 export declare function projectDir(root: string, cwd: string): string;
 export declare function projectMemoryPath(root: string, cwd: string): string;
 export declare function projectKeyPath(root: string, cwd: string): string;
+export declare function projectReferencePath(root: string, cwd: string): string;
 export declare function projectKeyArchivePath(root: string, cwd: string): string;
 export declare function projectArchivePath(root: string, cwd: string): string;
 export declare function projectArchiveDir(root: string, cwd: string): string;

@@ -4,6 +4,25 @@ All notable changes to this project are documented in this file. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **KEY.md delimiter** — repaired malformed `§\n` delimiters; 19 invariant entries now readable in snapshot via `repairKeyDelimiter(cwd)` one-time migration.
+- **Global memory corruption recovery** — restored `MEMORY.md` from sync remote after accidental `pruneGlobalMemory()` removed 4 of 5 entries during testing.
+- **Discipline note** — updated to match actual write behavior (daily-only + `memory_suggest target=key` for decisions; removed `project` reference).
+- **User Memory** — auto-bootstrap from session context when `USER.md` missing/empty.
+
+### Added
+- **REFERENCE.md slice in snapshot** — bounded `# Project Knowledge` section (2048 bytes cap) injects curated project reference.
+- `MaestroMemoryStore.repairKeyDelimiter(cwd)` — one-time repair for legacy `§\n` delimiters in KEY.md.
+- `MaestroMemoryStore.pruneGlobalMemory()` — keeps newest entries fitting 2048-byte snapshot cap.
+- `projectReferencePath(root, cwd)` resolver in storage layout.
+- `MaestroMemoryStore.resolveRoot()` — public accessor for memories root.
+
+### Changed
+- `renderSnapshot` now includes `# Project Knowledge` from REFERENCE.md and auto-creates `USER.md` from session context.
+- Discipline note updated to `Write daily via memory entries` + `memory_suggest target=key` for decisions.
+
 ## [1.2.4] - 2026-09-02
 
 ### Fixed
