@@ -16,6 +16,7 @@ import {
   readEntriesSync,
   appendEntryAtomicSync,
   writeEntriesAtomicSync,
+  writeAtomicSync,
   readEntries,
   appendEntryAtomic,
   writeEntriesAtomic,
@@ -666,6 +667,41 @@ export class MaestroMemoryStore {
   /** Snapshot that respects branch filter (same as above, explicit) */
   snapshotForBranch(cwd: string | null, branch?: string): string {
     return this.snapshot(cwd, { branch })
+  }
+
+  /**
+   * Repair malformed KEY.md delimiter.
+   * Reads raw file, splits on flexible delimiter (§\n or \n§\n), re-serializes canonical (\n§\n).
+   * Runs atomically (bypasses drift guard for repair). Returns { ok: true, repaired: count }.
+   */
+  repairKeyDelimiter(cwd: string): { ok: true; repaired: number } | { ok: false; error: string } {
+    try {
+      this.assertNotBlocked()
+    } catch (e: any) {
+      return { ok: false, error: e?.message ?? String(e) }
+    }
+    const file = this.fileFor('key', cwd)
+    return withLockSync(dirname(file), () => {
+      let raw = ''
+      try {
+        raw = readFileSync(file, 'utf8')
+      } catch (error: unknown) {
+        const code = (error as NodeJS.ErrnoException).code
+        if (code !== 'ENOENT') throw error
+        raw = ''
+      }
+      if (!raw.trim()) return { ok: true, repaired: 0 }
+      // Lenient split: handle both §\n and \n§\n
+      const entries = raw
+        .split(/\n?§\n?/)
+        .map(e => e.trim())
+        .filter(e => e.length > 0)
+      if (entries.length <= 1) return { ok: true, repaired: 0 } // already canonical or empty/single
+      // Re-serialize canonical (bypass drift guard for repair)
+      const canonical = serializeEntries(entries)
+      writeAtomicSync(file, canonical)
+      return { ok: true, repaired: entries.length }
+    })
   }
 }
 

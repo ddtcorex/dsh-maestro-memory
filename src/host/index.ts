@@ -2,13 +2,15 @@
  * dsh-maestro-memory — host entry (M2-PR-B: confirmation queue, gated memory_suggest, RPC decide, Review UI)
  */
 import { defineTool } from '@deepseek-ai/dsh-tools'
+import { existsSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs'
+import { join } from 'node:path'
 import { MaestroMemoryStore } from './memory/store.ts'
 import { applyBatch } from './memory/batch.ts'
 import { buildFeedbackLine } from './memory/feedback.ts'
 import { TodoStore, resolveQuadrant, DEFAULT_VIEW_LIMIT } from './todo/store.ts'
 import { TODO_TARGETS, TODO_STATUSES } from './storage/legacy-format.ts'
 import { SuggestionQueue, enqueueSuggestion, approveSuggestions, rejectSuggestions } from './review/queue.ts'
-import { resolveMemoryRoot, suggestionsPath, globalArchivePath, userArchivePath, projectKeyArchivePath, projectArchivePath, projectMemoryPath, dailyPath, todoArchivePath } from './storage/layout.ts'
+import { resolveMemoryRoot, suggestionsPath, globalArchivePath, userArchivePath, projectKeyArchivePath, projectArchivePath, projectMemoryPath, dailyPath, todoArchivePath, maestroMetaDir } from './storage/layout.ts'
 import { appendEntryAtomicSync } from './storage/atomic-store.ts'
 import * as migration from './migration/service.ts'
 import { SyncService } from './sync/service.ts'
@@ -57,6 +59,31 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
   const root = resolveMemoryRoot(config.memoryDir ?? null)
   const queue = new SuggestionQueue(suggestionsPath(root))
   const syncService = new SyncService(config.memoryDir ?? null, new RealGitAdapter())
+
+  // One-time KEY.md delimiter repair (guarded by flag file)
+  ctx.effect(() => {
+    const flagFile = join(maestroMetaDir(root), 'key-repaired-v1')
+    if (!existsSync(flagFile)) {
+      // Attempt repair for any project that has a KEY.md
+      try {
+        const projectsDir = join(root, 'projects')
+        if (existsSync(projectsDir)) {
+          for (const projectHash of readdirSync(projectsDir)) {
+            const keyFile = join(projectsDir, projectHash, 'KEY.md')
+            if (existsSync(keyFile)) {
+              store.repairKeyDelimiter(keyFile.replace(join(root, 'projects', projectHash, 'KEY.md'), ''))
+            }
+          }
+        }
+      } catch {}
+      // Write flag to prevent re-running
+      try {
+        mkdirSync(maestroMetaDir(root), { recursive: true })
+        writeFileSync(flagFile, 'ok', 'utf8')
+      } catch {}
+    }
+    return () => {}
+  }, 'maestro-memory: key-repair')
 
   // Auto-memory (opt-in, default disabled) — session/event → store
   ctx.effect(() => {
