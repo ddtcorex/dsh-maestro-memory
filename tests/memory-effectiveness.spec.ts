@@ -4,7 +4,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { MaestroMemoryStore } from '../src/host/memory/store.ts'
-import { resolveMemoryRoot, projectKeyPath, projectDir } from '../src/host/storage/layout.ts'
+import { renderSnapshot } from '../src/host/prompt/snapshot.ts'
+import { resolveMemoryRoot, projectKeyPath, projectDir, projectReferencePath } from '../src/host/storage/layout.ts'
 import { parseEntries } from '../src/host/storage/legacy-format.ts'
 import { readEntriesSync } from '../src/host/storage/atomic-store.ts'
 
@@ -104,5 +105,26 @@ describe('memory effectiveness: KEY repair', () => {
     res = store.repairKeyDelimiter(cwd)
     expect(res.ok).toBe(true)
     expect(res.repaired).toBe(2) // re-serializes 2 entries
+  })
+})
+
+describe('memory effectiveness: REFERENCE.md slice in snapshot', () => {
+  const cwdRef = '/tmp/test-ref-project'
+
+  it('renderSnapshot includes bounded # Project Knowledge from REFERENCE.md', () => {
+    const refFile = projectReferencePath(root, cwdRef)
+    mkdirSync(projectDir(root, cwdRef), { recursive: true })
+    writeFileSync(refFile, '# Reference\n\n## Rule 1\nNever edit deepseek-harness.\n\n## Rule 2\nAlways use plugins.\n', 'utf8')
+
+    const snap = renderSnapshot(store, { cwd: cwdRef, sessionId: 'test' })
+    expect(snap).toContain('# Project Knowledge')
+    expect(snap).toContain('Never edit deepseek-harness')
+    // Bounded: total snapshot reasonable
+    expect(Buffer.byteLength(snap, 'utf8')).toBeLessThan(15000)
+  })
+
+  it('renderSnapshot omits # Project Knowledge when REFERENCE.md absent', () => {
+    const snap = renderSnapshot(store, { cwd: '/tmp/nonexistent-project-xyz', sessionId: 'test' })
+    expect(snap).not.toContain('# Project Knowledge')
   })
 })

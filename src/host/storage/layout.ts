@@ -64,6 +64,9 @@ export function projectMemoryPath(root: string, cwd: string): string {
 export function projectKeyPath(root: string, cwd: string): string {
   return join(projectDir(root, cwd), 'KEY.md')
 }
+export function projectReferencePath(root: string, cwd: string): string {
+  return join(projectDir(root, cwd), 'REFERENCE.md')
+}
 export function projectKeyArchivePath(root: string, cwd: string): string {
   return join(projectDir(root, cwd), 'KEY-archive.md')
 }

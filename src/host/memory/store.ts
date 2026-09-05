@@ -103,6 +103,11 @@ function isWriteBlockedSync(root: string): boolean {
 export class MaestroMemoryStore {
   constructor(private readonly memoryDir: string | null = null) {}
 
+  /** Public accessor for the resolved memories root (used by snapshot/reference rendering). */
+  resolveRoot(): string {
+    return resolveMemoryRoot(this.memoryDir)
+  }
+
   private root(): string {
     return resolveMemoryRoot(this.memoryDir)
   }

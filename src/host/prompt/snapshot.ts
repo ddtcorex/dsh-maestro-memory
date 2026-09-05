@@ -1,6 +1,8 @@
 import { Buffer } from 'node:buffer'
+import { existsSync, readFileSync } from 'node:fs'
 import type { MaestroMemoryStore } from '../memory/store.ts'
 import { entryHeadPrefix, parseEntrySummary } from '../storage/legacy-format.ts'
+import { projectReferencePath } from '../storage/layout.ts'
 
 export interface SnapshotContext {
   cwd: string | null
@@ -93,6 +95,17 @@ export function renderSnapshot(
         const newest4 = proj.slice(-4).map((e) => e.slice(0, 600))
         const fitted = fitSection(newest4, (caps as any).autoRecall ?? 1024)
         if (fitted.length) parts.push(`# Project Context\n${fitted.join('\n---\n')}`)
+      }
+    } catch {}
+
+    // Bounded REFERENCE.md slice — project's curated knowledge (hybrid: invariants in KEY, narrative here)
+    // Only injects the top 2048 bytes so large references stay out of context but remain discoverable.
+    try {
+      const refPath = projectReferencePath(store.resolveRoot(), ctx.cwd)
+      if (existsSync(refPath)) {
+        const refContent = readFileSync(refPath, 'utf8')
+        const slice = refContent.slice(0, 2048)
+        if (slice.trim().length > 0) parts.push(`# Project Knowledge\n${slice}`)
       }
     } catch {}
   }
