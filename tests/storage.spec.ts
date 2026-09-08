@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { createHash } from 'node:crypto'
+import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { parseEntries, serializeEntries, isCanonical } from '../src/host/storage/legacy-format.ts'
 import {
@@ -69,7 +70,8 @@ describe('layout', () => {
     expect(() => projectDir('/root', '')).toThrow()
   })
   it('resolves root default', () => {
-    expect(resolveMemoryRoot(null as any)).toMatch(/\.dsh\/memories/)
+    expect(resolveMemoryRoot(null as any)).toMatch(/\.dsh\/dsh-maestro-memory/)
+    expect(resolveMemoryRoot(undefined)).toBe(join(homedir(), '.dsh', 'dsh-maestro-memory'))
     expect(resolveMemoryRoot('/custom')).toBe('/custom')
   })
   it('resolves five memory files', () => {

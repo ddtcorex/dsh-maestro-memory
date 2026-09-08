@@ -8,10 +8,10 @@ import { createHash } from 'node:crypto'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
-/** Resolve the canonical memories root: config.memoryDir or ~/.dsh/memories */
+/** Resolve the canonical memories root: config.memoryDir or ~/.dsh/dsh-maestro-memory */
 export function resolveMemoryRoot(memoryDir: string | null | undefined): string {
   if (memoryDir) return memoryDir
-  return join(homedir(), '.dsh', 'memories')
+  return join(homedir(), '.dsh', 'dsh-maestro-memory')
 }
 
 /** 12-hex project hash for a cwd (sha1(cwd).slice(0,12)) */
