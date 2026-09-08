@@ -3,7 +3,7 @@
  * archives, metadata, and legacy project hash.
  * Pure, no Cordis import. Uses node:path + node:crypto.
  */
-/** Resolve the canonical memories root: config.memoryDir or ~/.dsh/memories */
+/** Resolve the canonical memories root: config.memoryDir or ~/.dsh/dsh-maestro-memory */
 export declare function resolveMemoryRoot(memoryDir: string | null | undefined): string;
 /** 12-hex project hash for a cwd (sha1(cwd).slice(0,12)) */
 export declare function projectHash(cwd: string): string;
