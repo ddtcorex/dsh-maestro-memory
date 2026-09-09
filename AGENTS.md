@@ -22,7 +22,7 @@ Part of the Maestro Harness suite (installed as a DSH plugin). Originally forked
 - `src/host/review/queue.ts` — gated `memory_suggest` confirmation queue.
 - `src/host/skills-browser.ts` — read-only skills list (M6).
 - `src/client/index.tsx` — browser half (Memory view, Sync tab, Review queue UI).
-- `lib/` — committed build output. Generated; do not hand-edit.
+- `lib/` — gitignored build output. Generated; do not hand-edit, never commit.
 - `scripts/build-client.mjs` — client bundle builder.
 - `tests/*.spec.ts` — vitest suites (14 files, 211 tests).
 
@@ -36,7 +36,7 @@ pnpm test     # vitest run
 pnpm build    # tsc host + client && node scripts/build-client.mjs  -> lib/
 ```
 
-`pnpm build` is the required gate after any source change; `lib/` is committed, so a change is incomplete until the build refreshes it.
+`pnpm build` is the required gate after any source change; `lib/` is gitignored, so rebuild locally after pull and before restart — a change is incomplete until the build refreshes it.
 
 ## Git workflow
 
