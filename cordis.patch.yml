@@ -8,6 +8,10 @@
 - insert:
     - id: maestro-memory
       name: '@ddtcorex/dsh-maestro-memory'
+      # rpc.handle registers a webServer route inside an effect fiber which carries
+      # only the row's inject (not the module's); without webServer the row fails
+      # on harnesses that provide webServer after rows apply (DSH 0.1.5-rc.1+).
+      inject: ['tools', 'systemPrompt', 'connection', 'sessions', 'webServer']
       config:
         memoryDir: null
         snapshotOrder: 500
