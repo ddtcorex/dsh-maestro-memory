@@ -181,3 +181,30 @@ describe('renderSnapshot prompt-template safety', () => {
     expect(text).toContain('{a} {b}')
   })
 })
+
+describe('renderSnapshot recent-daily ordering', () => {
+  /** Yesterday in the store's local-calendar stamp, written straight to its dated file. */
+  function yesterdayStamp(): string {
+    const d = new Date()
+    d.setDate(d.getDate() - 1)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  }
+
+  it('keeps today when the byte cap fits only one day', () => {
+    store.add('daily', '[09:00] yesterday-entry-YYY', undefined, { date: yesterdayStamp() })
+    store.add('daily', '[10:00] today-entry-XXX')
+    const text = renderSnapshot(store, { cwd: null }, { caps: { recentDaily: 40 } })
+    expect(text).toContain('today-entry-XXX')
+    expect(text).not.toContain('yesterday-entry-YYY')
+  })
+
+  it('lists the two days oldest first when both fit', () => {
+    store.add('daily', '[09:00] yesterday-entry-YYY', undefined, { date: yesterdayStamp() })
+    store.add('daily', '[10:00] today-entry-XXX')
+    const text = renderSnapshot(store, { cwd: null })
+    const yesterdayAt = text.indexOf('yesterday-entry-YYY')
+    const todayAt = text.indexOf('today-entry-XXX')
+    expect(yesterdayAt).toBeGreaterThan(-1)
+    expect(todayAt).toBeGreaterThan(yesterdayAt)
+  })
+})
