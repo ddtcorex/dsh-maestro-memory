@@ -146,7 +146,9 @@ export function renderSnapshot(
   // Use local calendar (matching store.todayStamp) to avoid UTC/local drift near midnight.
   try {
     const recentDaily: string[] = []
-    for (let i = 0; i < 2; i++) {
+    // Oldest first: fitSection() treats the last element as the newest and keeps
+    // entries backwards from there, so today's entry must be pushed last.
+    for (let i = 1; i >= 0; i--) {
       const d = new Date()
       d.setDate(d.getDate() - i)
       const mm = String(d.getMonth() + 1).padStart(2, '0')
