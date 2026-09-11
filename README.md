@@ -57,6 +57,8 @@ dsh plugin --profile web add link:<workspace-root>/packages/dsh-maestro-memory
 
 Caps: `memory 2048 / user 4096 / key 6144 / recentDaily 512 / autoRecall 1024`.
 
+The rendered snapshot collapses brace runs of two or more to a single brace: DSH interpolates each prompt context and fails the whole turn on a `{{name}}` group with a malformed or unregistered name, so free-form memory prose never reaches it as template syntax.
+
 ## UI & RPC
 
 One `conversation.view` slot (`maestro-memory`, order 40) with tabs **Memory / Review / Todos / Skills / Health**. Health shows `coverage`, `daily last 7d`, `longest` + 5-dim score `S/R/J/C/Safety` (composite `min*0.4+mean*0.6`).

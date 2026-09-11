@@ -154,3 +154,30 @@ describe('renderSnapshot per-track byte caps', () => {
     expect(text).not.toContain('x'.repeat(601))
   })
 })
+
+describe('renderSnapshot prompt-template safety', () => {
+  // DSH interpolates every prompt context before it reaches the model
+  // (@deepseek-ai/dsh-system-prompt interpolate()) and fails the whole turn on a
+  // {{name}} group whose name is malformed or unregistered. Memory entries are
+  // free-form prose that may quote a template language, so the rendered snapshot
+  // must never contain a literal {{ at all — that is the exact trigger.
+  it('collapses double-brace runs across every injected section', () => {
+    store.add('memory', '[2026-09-11] global {{global_var}}')
+    store.add('user', '[2026-09-11] user {{user_var}}')
+    store.add('key', '[2026-09-11] key {{...}} literal', cwd)
+    store.add('project', '[2026-09-11] project {{cwd}}', cwd)
+    store.add('daily', '[09:00] daily {{release_path}}')
+    const text = renderSnapshot(store, { cwd })
+    expect(text).not.toContain('{{')
+    expect(text).toContain('{...}') // readable single-brace form survives
+    expect(text).toContain('{global_var}')
+  })
+
+  it('collapses nested brace runs without leaving an adjacent pair', () => {
+    store.add('key', '[2026-09-11] {{{triple}}} plus {{a}} {{b}}', cwd)
+    const text = renderSnapshot(store, { cwd })
+    expect(text).not.toContain('{{')
+    expect(text).toContain('{triple}')
+    expect(text).toContain('{a} {b}')
+  })
+})

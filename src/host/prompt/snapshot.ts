@@ -53,6 +53,19 @@ function fitSection(entries: string[], cap: number): string[] {
 }
 
 /**
+ * Collapse every run of two or more braces to one.
+ *
+ * DSH interpolates each prompt context before it reaches the model and fails
+ * the whole turn when a `{{name}}` group carries a malformed or unregistered
+ * name. Memory entries are free-form prose that may quote a template language,
+ * so the snapshot must not hand a literal `{{` to that step; a single brace is
+ * literal text to the interpolator.
+ */
+function neutralizePromptBraces(text: string): string {
+  return text.replace(/\{{2,}/g, '{').replace(/\}{2,}/g, '}')
+}
+
+/**
  * Bounded snapshot renderer — contract from README § System Prompt Snapshot:
  * Header (sessionId/sessionName) + USER + global MEMORY + current-project KEY
  * (branch-filtered) + Project Context (auto-recall top-4, 600 chars each)
@@ -161,5 +174,5 @@ export function renderSnapshot(
   const deduped = parts.filter((p) => p !== discipline)
   deduped.push(discipline)
 
-  return deduped.join('\n\n')
+  return neutralizePromptBraces(deduped.join('\n\n'))
 }
