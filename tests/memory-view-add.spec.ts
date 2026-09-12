@@ -63,4 +63,39 @@ describe('memory view manual add composer', () => {
     expect(view).toMatch(/'aria-label':`New \$\{track\} entry`/)
     expect(view).toMatch(/aria-label':'Add entry'|'aria-label': 'Add entry'/)
   })
+
+  it('keeps a disabled button out of the hover state entirely', () => {
+    // `.memx-btn:hover` (0,2,0) outranks `.memx-btn-primary` (0,1,0), so the
+    // generic hover rule repainted a DISABLED primary button white. The Add
+    // button is the plugin's first disabled button, which is what exposed it.
+    const css = src.match(/const MEM_CSS = `([\s\S]*?)`/)?.[1] ?? ''
+    expect(css).toMatch(/\.memx-btn:hover:not\(:disabled\)/)
+    expect(css).toMatch(/\.memx-btn-primary:hover:not\(:disabled\)/)
+    expect(css).not.toMatch(/\.memx-btn:hover \{/)
+  })
+
+  it('announces the add result through a live status region', () => {
+    // Without this the "added to daily" / "add failed" outcome is silent for
+    // screen readers: the message is plain text, not a live region.
+    expect(view).toMatch(/role:'status'/)
+    expect(view).toMatch(/'aria-live':'polite'/)
+  })
+
+  it('mounts the live region up front, not only when a message exists', () => {
+    // A live region added to the DOM together with its text is unreliable:
+    // assistive tech registers the region, then observes its updates. The
+    // container must therefore exist before there is anything to announce,
+    // which is why it is not behind a `msg ?` guard.
+    expect(view).not.toMatch(/msg\?React\.createElement\('div',\{className:'memx-muted'/)
+    expect(view).toMatch(/memx-status/)
+  })
+
+  it('keeps the empty live region out of layout without leaving the a11y tree', () => {
+    // `display:none` would remove it from the accessibility tree and silence
+    // the announcement; the clip technique hides it visually only.
+    const css = src.match(/const MEM_CSS = `([\s\S]*?)`/)?.[1] ?? ''
+    expect(css).toContain('.memx-status:empty')
+    expect(css).toMatch(/\.memx-status:empty \{[^}]*clip-path/)
+    expect(css).toMatch(/\.memx-status:empty \{[^}]*position:absolute/)
+  })
 })

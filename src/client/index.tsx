@@ -100,17 +100,20 @@ const MEM_CSS = `
 .memx-composer .memx-textarea { flex:1 1 220px; min-width:0; }
 .memx-composer .memx-btn { align-self:stretch; }
 @media (max-width:480px) { .memx-composer { flex-direction:column; align-items:stretch; } .memx-composer .memx-textarea { flex-basis:auto; width:100%; } }
-.memx-btn:disabled { opacity:.5; cursor:not-allowed; }
 .memx-input { height:44px; padding:0 10px; flex:1 1 140px; min-width:0; }
 @media (max-width:480px) { .memx-field { flex-direction:column; align-items:stretch; } .memx-input { flex-basis:auto; width:100%; } }
 .memx-input:disabled { opacity:.5; cursor:not-allowed; }
 .memx-btn { min-height:44px; padding:0 14px; border-radius:8px; border:1px solid var(--dsw-alias-border-l1); background:var(--dsw-alias-bg-layer-1); color:var(--dsw-alias-label-primary); display:inline-flex; align-items:center; justify-content:center; gap:6px; font-weight:500; }
-.memx-btn:hover { border-color:var(--dsw-alias-border-l2); background:var(--dsw-alias-bg-layer-2); }
+.memx-btn:hover:not(:disabled) { border-color:var(--dsw-alias-border-l2); background:var(--dsw-alias-bg-layer-2); }
 .memx-btn-primary { background:#06c; color:#fff; border-color:#06c; }
-.memx-btn-primary:hover { background:#05a; border-color:#05a; color:#fff; }
+.memx-btn-primary:hover:not(:disabled) { background:#05a; border-color:#05a; color:#fff; }
 .memx-btn-ghost { background:transparent; }
 .memx-btn-danger { background:var(--dsw-alias-state-error-primary); color:#fff; border-color:transparent; }
 .memx-btn:disabled { opacity:.5; cursor:not-allowed; }
+/* Live status region: always mounted so assistive tech registers it before it
+ * has anything to announce. Empty, it leaves the flex flow (absolute) yet stays
+ * in the accessibility tree; display:none would silence it. */
+.memx-status:empty { position:absolute; width:1px; height:1px; margin:0; padding:0; border:0; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
 
 /* bento / cards */
 .memx-grid { display:grid; gap:10px; width:100%; max-width:100%; min-width:0; }
@@ -504,7 +507,7 @@ function MemoryListView({ ctx }: {ctx:any}): React.ReactElement {
       React.createElement('textarea',{value:draft, onChange:(e:any)=>setDrafts(prev=>({...prev,[track]:e.target.value})), placeholder:`Add an entry to ${track}…`, 'aria-label':`New ${track} entry`, 'data-testid':'mem-add-content', className:'memx-textarea', rows:2, disabled:saving}),
       React.createElement('button',{onClick:addEntry, disabled:!canAdd, className:'memx-btn memx-btn-primary', 'data-testid':'mem-add-btn', 'aria-label':'Add entry'}, saving?'Saving…':'Add'),
     ),
-    msg?React.createElement('div',{className:'memx-muted'},msg):null,
+    React.createElement('div',{className:'memx-muted memx-status', role:'status', 'aria-live':'polite'}, msg),
     loading ? React.createElement('div',{className:'memx-muted'},'Loading memory…') : filtered.length===0 ? React.createElement('div',{className:'memx-empty'}, '(no entries)') :
       React.createElement('div',null,
         React.createElement('div',{className:'memx-muted', style:{marginBottom:6}}, `${filtered.length}/${entries.length} entries`),
