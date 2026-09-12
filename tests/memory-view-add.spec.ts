@@ -64,6 +64,19 @@ describe('memory view manual add composer', () => {
     expect(view).toMatch(/aria-label':'Add entry'|'aria-label': 'Add entry'/)
   })
 
+  it('styles the primary button with design-system tokens, not a hardcoded hex', () => {
+    // The file header already promised "all via DSH --dsw-alias-* tokens" and
+    // listed hardcoded light hex under AVOID, while `.memx-btn-primary` shipped
+    // a literal #06c/#05a. The harness's own ui-primitives/Button.module.css
+    // `.primary` is the reference recipe.
+    const css = src.match(/const MEM_CSS = `([\s\S]*?)`/)?.[1] ?? ''
+    expect(css).toMatch(/\.memx-btn-primary \{[^}]*var\(--dsw-alias-button-primary-fill\)/)
+    expect(css).toMatch(/\.memx-btn-primary \{[^}]*var\(--dsw-alias-label-primary-foreground\)/)
+    expect(css).toMatch(/\.memx-btn-primary:hover:not\(:disabled\) \{[^}]*var\(--dsw-alias-button-primary-hover\)/)
+    expect(css).not.toContain('#06c')
+    expect(css).not.toContain('#05a')
+  })
+
   it('keeps a disabled button out of the hover state entirely', () => {
     // `.memx-btn:hover` (0,2,0) outranks `.memx-btn-primary` (0,1,0), so the
     // generic hover rule repainted a DISABLED primary button white. The Add
