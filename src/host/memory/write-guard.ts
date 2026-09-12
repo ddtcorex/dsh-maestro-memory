@@ -43,7 +43,23 @@ interface GapState {
 }
 
 /**
- * Was the agent's newest turn opened by a direct human prompt?
+ * What the agent's newest turn actually was, read from its session log.
+ *
+ * `toolCalls` is what separates work from conversation: a turn that dispatched
+ * no tool merely answered a question, so no per-turn memory is owed and the
+ * watchdog must stay silent. Counting those turns would push the model to write
+ * filler entries — exactly what the discipline note forbids ("never write
+ * entries containing only 'Idle' or placeholders").
+ */
+export interface TurnFacts {
+  /** The turn was opened by a direct human prompt. */
+  human: boolean
+  /** How many tool calls the turn dispatched. */
+  toolCalls: number
+}
+
+/**
+ * Read the newest turn's origin and tool activity.
  *
  * `agent/turn-stopping` also ends turns started by a goal-continuation round
  * (`source.kind === 'goal'`) or an injected context batch (`'plugin'`, e.g.
@@ -51,7 +67,7 @@ interface GapState {
  * would fire the watchdog on work the human never asked for. An untagged
  * `user/message` (older hosts) counts as human, matching the documented default.
  */
-export function lastTurnWasMessage(agent: any): boolean {
+export function readTurnFacts(agent: any): TurnFacts {
   const events: readonly any[] = agent?.session?.ownEvents?.() ?? agent?.session?.events ?? []
   let startIndex = -1
   for (let i = events.length - 1; i >= 0; i -= 1) {
@@ -60,16 +76,29 @@ export function lastTurnWasMessage(agent: any): boolean {
       break
     }
   }
-  if (startIndex < 0) return false
+  if (startIndex < 0) return { human: false, toolCalls: 0 }
+  let human = false
+  let sawPrompt = false
+  let toolCalls = 0
   for (let i = startIndex + 1; i < events.length; i += 1) {
     const event = events[i]
     if (event?.type === 'turn/start') break // defensive: a new turn began
-    if (event?.type === 'user/message') {
+    if (event?.type === 'tool/call') {
+      toolCalls += 1
+      continue
+    }
+    if (!sawPrompt && event?.type === 'user/message') {
+      sawPrompt = true
       const kind = event.data?.source?.kind
-      return kind === undefined || kind === 'user'
+      human = kind === undefined || kind === 'user'
     }
   }
-  return false
+  return { human, toolCalls }
+}
+
+/** Was the agent's newest turn opened by a direct human prompt? */
+export function lastTurnWasMessage(agent: any): boolean {
+  return readTurnFacts(agent).human
 }
 
 /**
@@ -92,7 +121,11 @@ export function createWriteGapCounter(ctx: any, isEnabled: () => boolean): Write
       // Subagent sessions owe one entry per achievement, not one per turn.
       if (agent.session.header?.origin === 'subagent') return
       if (!isEnabled()) return
-      if (!lastTurnWasMessage(agent)) return
+      const facts = readTurnFacts(agent)
+      if (!facts.human) return
+      // A turn that dispatched no tool only answered a question — there is
+      // nothing to report, so no debt accrues and no filler entry is invited.
+      if (facts.toolCalls === 0) return
       const state = gaps.get(agent.id) ?? { gap: 0, wroteThisTurn: false }
       if (state.wroteThisTurn) {
         state.gap = 0

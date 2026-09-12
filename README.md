@@ -17,7 +17,7 @@ Durable memory and todos for DeepSeek Harness (DSH) — preserves `~/.dsh/memori
 ```sh
 pnpm install
 pnpm run build   # -> lib/
-pnpm test        # 330 tests
+pnpm test        # 341 tests
 ```
 
 **DSH profile (operator):**
@@ -41,8 +41,8 @@ dsh plugin --profile web add link:<workspace-root>/packages/dsh-maestro-memory
 ```
 
 `writeGuard` is read once at `apply()` time — changing it needs a profile edit and a
-host restart. `threshold` counts consecutive human turns with no `daily`/`project`
-write; any value below 1 is read as 1.
+host restart. `threshold` counts consecutive *working* human turns with no
+`daily`/`project` write; any value below 1 is read as 1.
 
 ## Tools
 
@@ -63,10 +63,21 @@ write; any value below 1 is read as 1.
 Caps: `memory 2048 / user 4096 / key 6144 / recentDaily 512 / autoRecall 1024`.
 
 **Write watchdog.** With `writeGuard.enabled`, the host counts consecutive human
-turns in which no `daily`/`project` entry was written (`agent/turn-stopping`,
-subagent-exempt, goal-continuation and injected turns excluded). Once the gap
-reaches `threshold`, the snapshot gains a `# ⚠️ Memory Write Backlog` section
-immediately before the discipline note, and it stays until a write succeeds.
+turns in which work happened but no `daily`/`project` entry was written
+(`agent/turn-stopping`). Three things must hold for a turn to count:
+
+1. it was opened by a direct human prompt — goal-continuation rounds
+   (`source.kind === 'goal'`) and injected context (`'plugin'`, e.g. wake
+   notices) carry no per-turn duty;
+2. it is not a subagent session;
+3. it **dispatched at least one tool call**. A turn that only answered a
+   question is conversation, not work, so no debt accrues — otherwise the
+   watchdog would push the model to write filler entries, exactly what the
+   discipline note forbids.
+
+Once the gap reaches `threshold`, the snapshot gains a
+`# ⚠️ Memory Write Backlog` section immediately before the discipline note, and
+it stays until a write succeeds.
 Only a write that actually recorded something counts — a deduplicated add does
 not. The alert text is static (threshold only, never the live count), so one
 open gap costs at most two tail snapshots: appear, then disappear.

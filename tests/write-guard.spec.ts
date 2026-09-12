@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { createWriteGapCounter, lastTurnWasMessage } from '../src/host/memory/write-guard.ts'
+import { createWriteGapCounter, lastTurnWasMessage, readTurnFacts } from '../src/host/memory/write-guard.ts'
 
 /**
  * Minimal Cordis-shaped context: `on` returns a disposer (the real contract),
@@ -30,11 +30,18 @@ function fakeCtx() {
   }
 }
 
-/** An agent whose last turn began with a `user/message` of the given source kind. */
-function fakeAgent(id: string, opts: { origin?: 'subagent'; kind?: string; events?: any[]; useOwnEvents?: boolean } = {}) {
+/**
+ * An agent whose last turn began with a `user/message` of the given source kind.
+ * `tools` appends that many `tool/call` events — a turn that dispatched no tool
+ * at all is a pure question/answer turn.
+ */
+function fakeAgent(id: string, opts: { origin?: 'subagent'; kind?: string; events?: any[]; useOwnEvents?: boolean; tools?: number } = {}) {
   const events = opts.events ?? [
     { type: 'turn/start', seq: 1, time: 0, data: { turn: 1 } },
     { type: 'user/message', seq: 2, time: 0, data: { source: opts.kind === undefined ? { kind: 'user' } : { kind: opts.kind } } },
+    ...Array.from({ length: opts.tools ?? 1 }, (_, i) => (
+      { type: 'tool/call', seq: 3 + i, time: 0, data: { turn: 1, step: 1, callId: `c${i}`, name: 'bash', arguments: '{}' } }
+    )),
   ]
   const session: any = { header: { origin: opts.origin, cwd: '/tmp/proj' }, events }
   if (opts.useOwnEvents !== false) session.ownEvents = () => events
@@ -98,6 +105,51 @@ describe('lastTurnWasMessage', () => {
   })
 })
 
+describe('readTurnFacts', () => {
+  it('reports a human turn and how many tools it dispatched', () => {
+    expect(readTurnFacts(fakeAgent('a', { tools: 3 }))).toEqual({ human: true, toolCalls: 3 })
+  })
+
+  it('reports zero tool calls for a pure question/answer turn', () => {
+    expect(readTurnFacts(fakeAgent('a', { tools: 0 }))).toEqual({ human: true, toolCalls: 0 })
+  })
+
+  it('counts tool calls that follow the human prompt', () => {
+    const agent = fakeAgent('a', {
+      events: [
+        { type: 'turn/start', data: { turn: 1 } },
+        { type: 'user/message', data: { source: { kind: 'user' } } },
+        { type: 'tool/call', data: { name: 'read' } },
+        { type: 'tool/result', data: {} },
+        { type: 'tool/call', data: { name: 'edit' } },
+      ],
+    })
+    expect(readTurnFacts(agent)).toEqual({ human: true, toolCalls: 2 })
+  })
+
+  it('does not count tool calls from an earlier turn', () => {
+    const agent = fakeAgent('a', {
+      events: [
+        { type: 'turn/start', data: { turn: 1 } },
+        { type: 'user/message', data: { source: { kind: 'user' } } },
+        { type: 'tool/call', data: { name: 'bash' } },
+        { type: 'turn/start', data: { turn: 2 } },
+        { type: 'user/message', data: { source: { kind: 'user' } } },
+      ],
+    })
+    expect(readTurnFacts(agent)).toEqual({ human: true, toolCalls: 0 })
+  })
+
+  it('reports a non-human origin with no facts to act on', () => {
+    expect(readTurnFacts(fakeAgent('a', { kind: 'goal', tools: 2 }))).toEqual({ human: false, toolCalls: 2 })
+  })
+
+  it('reports nothing for a missing session instead of throwing', () => {
+    expect(readTurnFacts(undefined)).toEqual({ human: false, toolCalls: 0 })
+    expect(readTurnFacts({ id: 'a' })).toEqual({ human: false, toolCalls: 0 })
+  })
+})
+
 describe('createWriteGapCounter', () => {
   it('counts one gap per completed human turn', () => {
     const ctx: any = fakeCtx()
@@ -133,6 +185,29 @@ describe('createWriteGapCounter', () => {
     stop(ctx, agent)
     expect(guard.gapOf(agent)).toBe(0)
     // The flag is consumed: the next write-less turn is a real gap of 1, not 2.
+    stop(ctx, agent)
+    expect(guard.gapOf(agent)).toBe(1)
+  })
+
+  it('does not count a human turn that dispatched no tool (pure Q&A)', () => {
+    // Answering a question is not work: pressing the model to write an entry
+    // here is exactly the filler the discipline note forbids.
+    const ctx: any = fakeCtx()
+    const guard = createWriteGapCounter(ctx, () => true)
+    const agent = fakeAgent('a', { tools: 0 })
+    stop(ctx, agent)
+    stop(ctx, agent)
+    stop(ctx, agent)
+    expect(guard.gapOf(agent)).toBe(0)
+  })
+
+  it('starts counting again as soon as a turn dispatches a tool', () => {
+    const ctx: any = fakeCtx()
+    const guard = createWriteGapCounter(ctx, () => true)
+    const agent = fakeAgent('a', { tools: 0 })
+    stop(ctx, agent)
+    expect(guard.gapOf(agent)).toBe(0)
+    agent.session.events.push({ type: 'tool/call', data: { name: 'bash' } })
     stop(ctx, agent)
     expect(guard.gapOf(agent)).toBe(1)
   })

@@ -57,8 +57,16 @@ function makeAgent(id: string, opts: { origin?: 'subagent' } = {}) {
     id,
     events,
     session: { header: { cwd, origin: opts.origin }, ownEvents: () => events },
-    /** Open a new turn sourced from a direct human prompt. */
+    /** Open a new turn sourced from a direct human prompt that dispatches a tool. */
     humanTurn() {
+      turn += 1
+      events.push({ type: 'turn/start', seq: seq += 1, time: 0, data: { turn } })
+      events.push({ type: 'user/message', seq: seq += 1, time: 0, data: { source: { kind: 'user' } } })
+      events.push({ type: 'tool/call', seq: seq += 1, time: 0, data: { turn, step: 1, callId: `c${turn}`, name: 'bash', arguments: '{}' } })
+      return turn
+    },
+    /** Open a new turn that only answers a question — no tool is dispatched. */
+    askTurn() {
       turn += 1
       events.push({ type: 'turn/start', seq: seq += 1, time: 0, data: { turn } })
       events.push({ type: 'user/message', seq: seq += 1, time: 0, data: { source: { kind: 'user' } } })
@@ -181,6 +189,40 @@ describe('write-guard wiring through apply()', () => {
     const text = h._snapshot(agent)
     expect(text.search(/Memory Write Backlog/i)).toBeLessThan(text.search(/End of every turn/i))
     expect(text.trimEnd().endsWith('bounded, max 8).')).toBe(true)
+  })
+
+  it('never trips on question/answer turns that dispatched no tool', () => {
+    // The exact false positive this gate removes: the human asks questions,
+    // the model answers without touching a tool, and nothing is owed.
+    const h = fakeCtx()
+    apply(h.ctx, { memoryDir: root, writeGuard: { enabled: true, threshold: 2 } })
+    const agent = makeAgent('a')
+    agent.askTurn(); agent.stop(h)
+    expect(h._snapshot(agent)).not.toMatch(/Memory Write Backlog/i)
+    agent.askTurn(); agent.stop(h)
+    agent.askTurn(); agent.stop(h)
+    agent.askTurn(); agent.stop(h)
+    expect(h._snapshot(agent)).not.toMatch(/Memory Write Backlog/i)
+  })
+
+  it('still trips after work turns that wrote nothing', () => {
+    const h = fakeCtx()
+    apply(h.ctx, { memoryDir: root, writeGuard: { enabled: true, threshold: 2 } })
+    const agent = makeAgent('a')
+    agent.humanTurn(); agent.stop(h)
+    agent.humanTurn(); agent.stop(h)
+    expect(h._snapshot(agent)).toMatch(/Memory Write Backlog/i)
+  })
+
+  it('questions after a debt do not clear it, and answers do not deepen it', () => {
+    const h = fakeCtx()
+    apply(h.ctx, { memoryDir: root, writeGuard: { enabled: true, threshold: 2 } })
+    const agent = makeAgent('a')
+    agent.humanTurn(); agent.stop(h)
+    agent.askTurn(); agent.stop(h)
+    expect(h._snapshot(agent)).not.toMatch(/Memory Write Backlog/i)
+    agent.humanTurn(); agent.stop(h)
+    expect(h._snapshot(agent)).toMatch(/Memory Write Backlog/i)
   })
 
   it('gives a subagent the restrained cadence and never the backlog alert', () => {

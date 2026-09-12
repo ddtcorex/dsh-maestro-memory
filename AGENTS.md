@@ -16,7 +16,7 @@ Part of the Maestro Harness suite (installed as a DSH plugin). Originally forked
 - `src/host/memory/store.ts` — `MaestroMemoryStore` over five tracks (`memory`/`user`/`project`/`key`/`daily`): add/list/replace/remove/archive/expand + `snapshot`.
 - `src/host/todo/store.ts` — `TodoStore` (four tracks, quadrant/due/status, smart view).
 - `src/host/prompt/snapshot.ts` — `renderSnapshot(store, ctx, opts)`: bounded snapshot (USER + MEMORY + KEY + Project Context auto-recall + bounded Recent Daily + REFERENCE slice) with session header, the end-of-turn discipline note, the optional write-backlog alert, and the subagent cadence variant.
-- `src/host/memory/write-guard.ts` — per-turn write watchdog: `createWriteGapCounter(ctx, isEnabled)` counts consecutive human turns with no guarded write on `agent/turn-stopping`; `isGuardedTrack(target)` is the `daily`/`project` predicate.
+- `src/host/memory/write-guard.ts` — per-turn write watchdog: `createWriteGapCounter(ctx, isEnabled)` counts consecutive human turns that did work but wrote no guarded track, on `agent/turn-stopping`; `readTurnFacts(agent)` reads turn origin + tool activity from the session log; `isGuardedTrack(target)` is the `daily`/`project` predicate.
 - `src/host/storage/` — `layout.ts` (paths), `atomic-store.ts` (append/read/write with directory lock), `legacy-format.ts` (entry parsing, summary/branch tags).
 - `src/host/sync/` — git-backed memory sync (`SyncService`, `RealGitAdapter`, merge/conflict resolution).
 - `src/host/migration/` — 6-phase staged replacement (`inspect`/`backup`/`adopt`/`verify`, read-only by default, `--apply` to mutate).
@@ -25,7 +25,7 @@ Part of the Maestro Harness suite (installed as a DSH plugin). Originally forked
 - `src/client/index.tsx` — browser half (Memory view, Sync tab, Review queue UI).
 - `lib/` — gitignored build output. Generated; do not hand-edit, never commit.
 - `scripts/build-client.mjs` — client bundle builder.
-- `tests/*.spec.ts` — vitest suites (26 files, 330 tests).
+- `tests/*.spec.ts` — vitest suites (26 files, 341 tests).
 
 ## Development
 
@@ -53,7 +53,7 @@ pnpm build    # tsc host + client && node scripts/build-client.mjs  -> lib/
 - **Atomic writes only** — route mutations through `atomic-store.ts` (`withLockSync` for read-modify-write; `appendEntryAtomicSync` for appends). Never `readFileSync`+`writeFileSync` a memory file directly.
 - **Bounded snapshot** — sections are byte-capped per {@link SNAPSHOT_SECTION_CAPS} and the rendered text collapses brace runs (DSH prompt interpolation fails a turn on a malformed `{{name}}`). For human-facing sessions the end-of-turn discipline note is preserved **verbatim** and is always the last part; the write-backlog alert renders immediately *before* it and never displaces it.
 - **Subagent sessions** (`session.header.origin === 'subagent'`) get a per-achievement cadence instead of the per-turn duty and never the backlog alert. Changing the human-facing note must not change the subagent variant, and vice versa.
-- **Write watchdog is opt-in** (`config.writeGuard`, default off) and in-memory only: it guards per-turn drift inside one process, not durable state. A write discharges the duty only when it actually recorded something (`daily`/`project`, not a duplicate).
+- **Write watchdog is opt-in** (`config.writeGuard`, default off) and in-memory only: it guards per-turn drift inside one process, not durable state. A turn counts only when it is human-origin AND dispatched at least one tool call (`readTurnFacts`) — pure question/answer turns must never accrue debt. A write discharges the duty only when it actually recorded something (`daily`/`project`, not a duplicate).
 - **Gated writes** — the model writes via `memory_suggest` (queue → user approve) and `dtodo`; `memory add` is the explicit path. RPC endpoints are `loopback` authority.
 - Keep the host/client split; client bundle injects `['@deepseek-ai/dsh-client-runtime','@deepseek-ai/dsh-client-ui-slots']`.
 - Strict TDD with vitest; every deterministic operation is a tool, LLM is reasoning-only.
