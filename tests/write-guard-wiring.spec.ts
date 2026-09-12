@@ -182,4 +182,15 @@ describe('write-guard wiring through apply()', () => {
     expect(text.search(/Memory Write Backlog/i)).toBeLessThan(text.search(/End of every turn/i))
     expect(text.trimEnd().endsWith('bounded, max 8).')).toBe(true)
   })
+
+  it('gives a subagent the restrained cadence and never the backlog alert', () => {
+    const h = fakeCtx()
+    apply(h.ctx, { memoryDir: root, writeGuard: { enabled: true, threshold: 1 } })
+    const sub = makeAgent('sub', { origin: 'subagent' })
+    sub.humanTurn(); sub.stop(h)
+    const text = h._snapshot(sub)
+    expect(text).toMatch(/independent achievement/i)
+    expect(text).not.toMatch(/Memory Write Backlog/i)
+    expect(text).not.toMatch(/End of every turn/i)
+  })
 })

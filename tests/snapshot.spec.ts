@@ -263,3 +263,49 @@ describe('renderSnapshot write-guard escalation', () => {
     expect(text.indexOf('End of every turn')).toBe(text.lastIndexOf('End of every turn'))
   })
 })
+
+describe('renderSnapshot subagent gating', () => {
+  it('replaces the per-turn duty with the per-achievement cadence', () => {
+    const text = renderSnapshot(store, { cwd, isSubagent: true })
+    expect(text).toMatch(/independent achievement/i)
+    expect(text).toMatch(/do not write for writing's sake/i)
+    // The per-turn cadence belongs to human-facing sessions only.
+    expect(text).not.toMatch(/End of every turn/i)
+    expect(text).not.toMatch(/dtodo list/i)
+  })
+
+  it('leaves the human-facing discipline note untouched when not a subagent', () => {
+    const text = renderSnapshot(store, { cwd, isSubagent: false })
+    expect(text).toMatch(/End of every turn/i)
+    expect(text).not.toMatch(/independent achievement/i)
+  })
+
+  it('defaults to the human-facing note when isSubagent is absent', () => {
+    expect(renderSnapshot(store, { cwd })).toMatch(/End of every turn/i)
+  })
+
+  it('still injects the shared memory context for a subagent', () => {
+    store.add('memory', '[2026-09-12] global-entry')
+    store.add('user', '[2026-09-12] user-entry')
+    store.add('key', '[2026-09-12] key-entry', cwd)
+    store.add('project', '[2026-09-12] project-entry', cwd)
+    const text = renderSnapshot(store, { cwd, isSubagent: true })
+    expect(text).toContain('global-entry')
+    expect(text).toContain('user-entry')
+    expect(text).toContain('key-entry')
+    expect(text).toContain('Project Context')
+  })
+
+  it('never renders the write backlog alert for a subagent, even when asked', () => {
+    const text = renderSnapshot(store, { cwd, isSubagent: true }, { writeGuard: { threshold: 2 } })
+    expect(text).not.toMatch(/Memory Write Backlog/i)
+  })
+
+  it('keeps the subagent note last, exactly once, and brace-free', () => {
+    store.add('memory', '[2026-09-12] global entry with {brace}')
+    const text = renderSnapshot(store, { cwd, isSubagent: true })
+    expect(text).not.toContain('{{')
+    expect((text.match(/Turn end \(subagent session\)/g) || []).length).toBe(1)
+    expect(text.trimEnd().endsWith('The per-turn daily cadence applies to human-facing sessions only.')).toBe(true)
+  })
+})

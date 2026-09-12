@@ -147,7 +147,7 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
           && writeGuard.gapOf(agent) >= writeGuardConfig.threshold
         return renderSnapshot(
           store,
-          { cwd, branch, sessionId, sessionName },
+          { cwd, branch, sessionId, sessionName, isSubagent },
           due ? { writeGuard: { threshold: writeGuardConfig.threshold } } : {},
         )
       },
