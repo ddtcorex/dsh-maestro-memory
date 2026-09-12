@@ -19,6 +19,17 @@
 /** Tracks whose write discharges the per-turn duty (the progression logs). */
 export const WRITE_GUARD_TRACKS = ['daily', 'project'] as const
 
+/**
+ * Does a write to this track discharge the per-turn duty?
+ *
+ * The slow-moving tracks are deliberately excluded: `memory`/`user` record
+ * durable facts rather than "what happened this turn", and `key` goes through
+ * the confirmation queue rather than an immediate write.
+ */
+export function isGuardedTrack(target: unknown): boolean {
+  return typeof target === 'string' && (WRITE_GUARD_TRACKS as readonly string[]).includes(target)
+}
+
 export interface WriteGapHandle {
   /** Completed consecutive human turns in which this agent wrote no guarded track. */
   gapOf(agent?: unknown): number

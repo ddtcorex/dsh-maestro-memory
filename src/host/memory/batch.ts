@@ -23,7 +23,17 @@ export interface BatchEntryInput {
 }
 
 export type BatchResult =
-  | { ok: true; ids: (string | undefined)[] }
+  | {
+    ok: true
+    ids: (string | undefined)[]
+    /**
+     * Entries this call actually recorded, in call order. Duplicates are
+     * absent, so a caller can tell "something new was written" from "every
+     * entry already existed" — the write watchdog needs exactly that
+     * distinction to decide whether the turn's duty was discharged.
+     */
+    added: { index: number; target: MemoryTarget }[]
+  }
   | { ok: false; index: number; error: string }
 
 /**
@@ -46,6 +56,7 @@ export function applyBatch(
   entries: BatchEntryInput[],
 ): BatchResult {
   const added: { target: MemoryTarget; token: string; cwd?: string; date?: string }[] = []
+  const addedEntries: { index: number; target: MemoryTarget }[] = []
   const ids: (string | undefined)[] = []
 
   for (let i = 0; i < entries.length; i++) {
@@ -78,6 +89,7 @@ export function applyBatch(
     ids.push(res.id)
     // Duplicates carry no id and did not modify storage — nothing to roll back.
     if (!res.duplicate) {
+      addedEntries.push({ index: i, target: target as MemoryTarget })
       added.push({
         target: target as MemoryTarget,
         // key entries carry a generated id token; other tracks are stored
@@ -88,7 +100,7 @@ export function applyBatch(
       })
     }
   }
-  return { ok: true, ids }
+  return { ok: true, ids, added: addedEntries }
 }
 
 function fail(

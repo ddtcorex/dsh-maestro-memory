@@ -19,19 +19,46 @@ import { listSkillsSync, resolveDefaultMaestroSkillsDir } from './skills-browser
 import { renderSnapshot } from './prompt/snapshot.ts'
 import { installAutoMemoryHooks, DEFAULT_AUTO_MEMORY, type AutoMemoryOptions } from './auto-memory.ts'
 import { computeFiveDim } from './health-score.ts'
+import { createWriteGapCounter, isGuardedTrack } from './memory/write-guard.ts'
 
 export const inject = ['tools', 'systemPrompt', 'connection', 'sessions'] as const
+
+export interface WriteGuardConfig {
+  /** Enable the per-turn write watchdog (default false — an opt-in pacing aid). */
+  enabled?: boolean
+  /** Consecutive write-less human turns before the snapshot escalates. */
+  threshold?: number
+}
 
 export interface MaestroMemoryConfig {
   memoryDir?: string | null
   snapshotOrder?: number
   autoMemory?: Partial<AutoMemoryOptions>
+  writeGuard?: WriteGuardConfig
+}
+
+export const DEFAULT_WRITE_GUARD: Required<WriteGuardConfig> = {
+  enabled: false,
+  threshold: 2,
 }
 
 export const DEFAULTS: Required<MaestroMemoryConfig> = {
   memoryDir: null,
   snapshotOrder: 500,
   autoMemory: { ...DEFAULT_AUTO_MEMORY },
+  writeGuard: { ...DEFAULT_WRITE_GUARD },
+}
+
+/** Resolve the write-guard config, keeping the threshold a usable positive integer. */
+export function resolveWriteGuard(config?: WriteGuardConfig): Required<WriteGuardConfig> {
+  const merged = { ...DEFAULT_WRITE_GUARD, ...(config ?? {}) }
+  const raw = Number(merged.threshold)
+  return {
+    enabled: merged.enabled === true,
+    // A misconfigured threshold must not silently disable the watchdog, and 0
+    // must not mean "warn every turn": any value below 1 reads as 1.
+    threshold: Number.isFinite(raw) ? Math.max(1, Math.trunc(raw)) : DEFAULT_WRITE_GUARD.threshold,
+  }
 }
 
 export const READ_ACTIONS = new Set(['list', 'expand'])
@@ -59,6 +86,10 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
   const root = resolveMemoryRoot(config.memoryDir ?? null)
   const queue = new SuggestionQueue(suggestionsPath(root))
   const syncService = new SyncService(config.memoryDir ?? null, new RealGitAdapter())
+  const writeGuardConfig = resolveWriteGuard(config.writeGuard)
+  // Per-turn write watchdog (opt-in). The counter lives for the process; it is
+  // a pacing aid for drift inside one run, not durable state.
+  const writeGuard = createWriteGapCounter(ctx, () => writeGuardConfig.enabled)
 
   // One-time KEY.md delimiter repair (guarded by flag file)
   ctx.effect(() => {
@@ -99,15 +130,26 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
       name: 'memory:snapshot',
       order,
       text: (promptCtx: any) => {
-        const cwd: string | null = promptCtx?.agent?.session?.header?.cwd ?? null
-        const branch: string | undefined = promptCtx?.agent?.session?.header?.branch ?? undefined
-        const sessionId: string | undefined = promptCtx?.agent?.session?.header?.sessionId
-          ?? promptCtx?.agent?.session?.id
+        const agent = promptCtx?.agent
+        const cwd: string | null = agent?.session?.header?.cwd ?? null
+        const branch: string | undefined = agent?.session?.header?.branch ?? undefined
+        const sessionId: string | undefined = agent?.session?.header?.sessionId
+          ?? agent?.session?.id
           ?? undefined
-        const sessionName: string | undefined = promptCtx?.agent?.session?.header?.sessionName
-          ?? promptCtx?.agent?.session?.name
+        const sessionName: string | undefined = agent?.session?.header?.sessionName
+          ?? agent?.session?.name
           ?? undefined
-        return renderSnapshot(store, { cwd, branch, sessionId, sessionName })
+        // Subagent sessions owe one entry per achievement, not one per turn —
+        // the per-turn watchdog is a human-facing duty and never applies to them.
+        const isSubagent = agent?.session?.header?.origin === 'subagent'
+        const due = writeGuardConfig.enabled
+          && !isSubagent
+          && writeGuard.gapOf(agent) >= writeGuardConfig.threshold
+        return renderSnapshot(
+          store,
+          { cwd, branch, sessionId, sessionName },
+          due ? { writeGuard: { threshold: writeGuardConfig.threshold } } : {},
+        )
       },
     })
     return () => {
@@ -166,6 +208,12 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
                   if (!batchRes.ok) {
                     return { content: [{ type: 'text', text: `batch failed at [${batchRes.index}]: ${batchRes.error}` }] }
                   }
+                  // Discharge the write-watchdog duty only when the batch really
+                  // recorded something on a guarded track — a duplicate-only
+                  // batch changed nothing, so the backlog still stands.
+                  if (batchRes.added.some((entry) => isGuardedTrack(entry.target))) {
+                    writeGuard.noteWrite(exec?.agent)
+                  }
                   return { content: [{ type: 'text', text: `added ${batchRes.ids.length} ${batchRes.ids.length === 1 ? 'entry' : 'entries'} (batch)` }] }
                 }
               } else if (!target) {
@@ -191,6 +239,9 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
                 date: args.date,
               })
               if (!res.ok) return { content: [{ type: 'text', text: `add failed: ${res.error}` }] }
+              // Discharge the per-turn write duty: only a guarded track counts,
+              // and a deduplicated add recorded nothing new this turn.
+              if (!res.duplicate && isGuardedTrack(target)) writeGuard.noteWrite(exec?.agent)
               return { content: [{ type: 'text', text: res.duplicate ? 'duplicate' : `added to ${target}` }] }
             }
             case 'list': {

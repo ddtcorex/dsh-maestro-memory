@@ -69,7 +69,7 @@ describe('applyBatch', () => {
   })
 
   it('empty batch succeeds trivially', () => {
-    expect(applyBatch(store, [])).toEqual({ ok: true, ids: [] })
+    expect(applyBatch(store, [])).toEqual({ ok: true, ids: [], added: [] })
   })
 
   it('per-entry options (cwd/date/branches/summary) are honored', () => {

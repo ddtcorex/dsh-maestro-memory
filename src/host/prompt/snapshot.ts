@@ -20,6 +20,11 @@ export type SnapshotSectionKey = keyof typeof SNAPSHOT_SECTION_CAPS
 export interface SnapshotRenderOpts {
   /** Partial override of {@link SNAPSHOT_SECTION_CAPS}; unspecified sections keep defaults. */
   caps?: Partial<Record<SnapshotSectionKey, number>>
+  /**
+   * Set only while the per-turn write watchdog is due for this session. The
+   * caller owns the gap counter; the renderer only renders the escalation.
+   */
+  writeGuard?: { threshold: number } | null
 }
 
 const SECTION_SEP = '\n---\n'
@@ -174,7 +179,22 @@ export function renderSnapshot(
   // Defensive: strip any pre-existing discipline entry (should never occur — parts is fresh per call)
   // then append exactly once so the note is guaranteed last even for empty stores or repeated calls.
   const deduped = parts.filter((p) => p !== discipline)
+  // Write watchdog escalation, placed immediately before the discipline note so
+  // the note stays the snapshot's final instruction. The text is deliberately
+  // static — the threshold comes from configuration, never from the live gap —
+  // so one open gap costs at most two tail snapshots (appear, then disappear).
+  if (opts.writeGuard) deduped.push(renderWriteBacklog(opts.writeGuard.threshold))
   deduped.push(discipline)
 
   return neutralizePromptBraces(deduped.join('\n\n'))
+}
+
+/**
+ * Sticky backlog alert emitted while the per-turn write watchdog is tripped.
+ * Names only the guarded tracks so it can never order a write to a track the
+ * human disabled.
+ */
+function renderWriteBacklog(threshold: number): string {
+  return `# ⚠️ Memory Write Backlog
+This session has gone ${threshold}+ consecutive turns with no daily/project memory write. Before this turn ends, catch up in ONE memory call — action=add with an entries[] array holding one item per track, condensing the missed turns into 1-2 lines each — then resume the one-entry-per-turn rhythm.`
 }

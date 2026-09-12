@@ -52,6 +52,7 @@ function fakeCtx(memoryDir: string) {
       const dispose = fn()
       return dispose
     },
+    on: () => () => {},
     get: (name: string) => (name === 'connection' ? ctx.connection : undefined),
     state: { tools, rpcHandlers, rpcTransportHandlers, rpcOptions },
   }

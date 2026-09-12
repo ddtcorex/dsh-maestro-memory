@@ -171,6 +171,7 @@ describe('M4-PR-A rehearsal: profile reload, live reads, one write against copie
         workspaceRegistry: {},
         connection: { rpc: { handle: (ch: string, h: any) => { rpcHandlers.set(ch, h); return () => {} } } },
         effect: (fn: any) => { const d = fn(); return d },
+        on: () => () => {},
         get: (n: string) => (n === 'connection' ? ctx.connection : undefined),
         state: { tools, rpcHandlers, snapshots },
       }
@@ -265,6 +266,7 @@ describe('M4-PR-A rehearsal: full end-to-end (fixture profile + migrate + reload
           workspaceRegistry: {},
           connection: { rpc: { handle: () => () => {} } },
           effect: (fn: any) => fn(),
+          on: () => () => {},
           get: () => undefined,
           state: { tools },
         }

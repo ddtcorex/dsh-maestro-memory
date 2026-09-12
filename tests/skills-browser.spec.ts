@@ -259,6 +259,7 @@ describe('M6 skills-browser: RPC read-only integration', () => {
         return () => {}
       } } },
       effect: (fn: any) => { const d = fn(); return d },
+      on: () => () => {},
       get: (n: string) => (n === 'connection' ? fakeCtx.connection : undefined),
     }
     const tmp = await mkdtemp(join(tmpdir(), 'skills-rpc-'))

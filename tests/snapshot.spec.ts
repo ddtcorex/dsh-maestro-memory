@@ -208,3 +208,58 @@ describe('renderSnapshot recent-daily ordering', () => {
     expect(todayAt).toBeGreaterThan(yesterdayAt)
   })
 })
+
+describe('renderSnapshot write-guard escalation', () => {
+  const WARNING = /Memory Write Backlog/i
+  const DUTY = /End of every turn/i
+
+  it('omits the backlog warning when the guard is not due', () => {
+    store.add('memory', '[2026-09-12] global entry')
+    expect(renderSnapshot(store, { cwd })).not.toMatch(WARNING)
+  })
+
+  it('omits the warning when no writeGuard option is passed at all', () => {
+    store.add('memory', '[2026-09-12] global entry')
+    expect(renderSnapshot(store, { cwd }, {})).not.toMatch(WARNING)
+  })
+
+  it('injects the backlog warning once the guard is due', () => {
+    store.add('memory', '[2026-09-12] global entry')
+    expect(renderSnapshot(store, { cwd }, { writeGuard: { threshold: 2 } })).toMatch(WARNING)
+  })
+
+  it('renders the warning before the discipline note and keeps that note last, exactly once', () => {
+    store.add('memory', '[2026-09-12] global entry')
+    const text = renderSnapshot(store, { cwd }, { writeGuard: { threshold: 2 } })
+    const warnAt = text.search(WARNING)
+    const dutyAt = text.search(DUTY)
+    expect(warnAt).toBeGreaterThan(-1)
+    expect(dutyAt).toBeGreaterThan(warnAt)
+    // The end-of-turn note is the snapshot's final instruction — the warning
+    // must not displace it, and repeated rendering must not duplicate it.
+    expect(text.indexOf('End of every turn')).toBe(text.lastIndexOf('End of every turn'))
+    expect(text.trimEnd().endsWith('bounded, max 8).')).toBe(true)
+  })
+
+  it('names the guarded tracks and the configured threshold, with no live count', () => {
+    store.add('memory', '[2026-09-12] global entry')
+    const text = renderSnapshot(store, { cwd }, { writeGuard: { threshold: 3 } })
+    expect(text).toContain('daily/project')
+    expect(text).toMatch(/\b3\b/)
+    // Static text is the cache contract: an open gap costs two tail snapshots
+    // (appear, then disappear), so identical inputs must render identical bytes.
+    expect(renderSnapshot(store, { cwd }, { writeGuard: { threshold: 3 } })).toBe(text)
+  })
+
+  it('never leaks a template brace through the warning', () => {
+    store.add('memory', '[2026-09-12] global entry')
+    const text = renderSnapshot(store, { cwd }, { writeGuard: { threshold: 2 } })
+    expect(text).not.toContain('{{')
+  })
+
+  it('still renders the discipline note alone when the store is empty and the guard is due', () => {
+    const text = renderSnapshot(store, { cwd: null }, { writeGuard: { threshold: 2 } })
+    expect(text).toMatch(WARNING)
+    expect(text.indexOf('End of every turn')).toBe(text.lastIndexOf('End of every turn'))
+  })
+})
