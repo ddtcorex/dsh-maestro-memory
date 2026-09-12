@@ -23,7 +23,17 @@ export interface BatchEntryInput {
 }
 
 export type BatchResult =
-  | { ok: true; ids: (string | undefined)[] }
+  | {
+    ok: true
+    ids: (string | undefined)[]
+    /**
+     * Entries this call actually recorded, in call order. Duplicates are
+     * absent, so a caller can tell "something new was written" from "every
+     * entry already existed" — the write watchdog needs exactly that
+     * distinction to decide whether the turn's duty was discharged.
+     */
+    added: { index: number; target: MemoryTarget }[]
+  }
   | { ok: false; index: number; error: string }
 
 /**
@@ -45,7 +55,7 @@ export function applyBatch(
   store: MaestroMemoryStore,
   entries: BatchEntryInput[],
 ): BatchResult {
-  const added: { target: MemoryTarget; token: string; cwd?: string; date?: string }[] = []
+  const added: { index: number; target: MemoryTarget; token: string; cwd?: string; date?: string }[] = []
   const ids: (string | undefined)[] = []
 
   for (let i = 0; i < entries.length; i++) {
@@ -79,6 +89,7 @@ export function applyBatch(
     // Duplicates carry no id and did not modify storage — nothing to roll back.
     if (!res.duplicate) {
       added.push({
+        index: i,
         target: target as MemoryTarget,
         // key entries carry a generated id token; other tracks are stored
         // verbatim, so the trimmed stored content is the precise removal token.
@@ -88,12 +99,12 @@ export function applyBatch(
       })
     }
   }
-  return { ok: true, ids }
+  return { ok: true, ids, added: added.map(({ index, target }) => ({ index, target })) }
 }
 
 function fail(
   store: MaestroMemoryStore,
-  added: { target: MemoryTarget; token: string; cwd?: string; date?: string }[],
+  added: { index: number; target: MemoryTarget; token: string; cwd?: string; date?: string }[],
   index: number,
   error: string,
 ): BatchResult {

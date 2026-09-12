@@ -4,6 +4,26 @@ All notable changes to this project are documented in this file. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-09-12
+
+### Added
+- **Per-turn write watchdog** (`src/host/memory/write-guard.ts`, opt-in via `config.writeGuard`) — counts consecutive human turns in which no `daily`/`project` entry was written, and escalates in the snapshot once the gap reaches `threshold` (default 2). Long sessions gradually dilute the fixed end-of-turn discipline note, and a missed write used to be dropped silently; the watchdog tracks compliance on the program side so the snapshot itself escalates until the model writes.
+  - Counts only turns opened by a direct human prompt — goal-continuation rounds (`source.kind === 'goal'`) and injected context (`'plugin'`, e.g. wake notices) carry no per-turn duty.
+  - Counts only turns that **dispatched at least one tool call**. A turn that merely answered a question did no work, so no debt accrues: without this gate the watchdog fired on ordinary question/answer exchanges and pressured the model into writing filler entries — exactly what the discipline note forbids ("never write entries containing only 'Idle' or placeholders"). `readTurnFacts(agent)` reads origin and tool activity from the session log in one scan.
+  - `noteWrite` marks the turn and the reset happens at `turn-stopping`, never at write time: resetting mid-turn would count the writing turn itself as a gap and misfire on every healthy turn.
+  - Only a write that actually recorded something discharges the duty — a deduplicated add does not — so `applyBatch` now reports which entries it really added.
+  - The listener is registered through `ctx.effect` and isolates every error: a pacing aid must never fail a turn.
+  - In-memory only; a host restart clears gaps.
+- **Write-backlog snapshot alert** — a `# ⚠️ Memory Write Backlog` section rendered immediately before the end-of-turn discipline note, which stays the snapshot's final instruction. Its text is static (threshold only, never the live count), so one open gap costs at most two tail snapshots: appear, then disappear.
+- **Manual add composer in the Memory tab** — each track now has an add box posting to the existing `memory.mutate` RPC (`action: 'add'`), so recording a durable fact no longer needs a model round-trip. Drafts are bucketed per track, and the button stays disabled while the entry is empty or while `key`/`project` has no cwd.
+
+### Changed
+- **Subagent sessions get a per-achievement cadence** — a subagent reports to a parent session rather than to the human, so its snapshot now carries a restrained turn-end note (one entry per independent achievement, nothing when there is nothing to report) instead of the per-turn duty, and never the backlog alert. The shared memory context (MEMORY / USER / KEY / Project Context) is still injected.
+- `config.writeGuard` is resolved once at `apply()` time; a threshold below 1 reads as 1 rather than disabling the watchdog or firing on every turn.
+
+### Fixed
+- Removed a stale upstream repository name from `AGENTS.md` (public-doc hygiene).
+
 ## [1.2.5] - 2026-09-05
 
 ### Fixed

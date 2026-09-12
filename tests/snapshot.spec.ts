@@ -208,3 +208,104 @@ describe('renderSnapshot recent-daily ordering', () => {
     expect(todayAt).toBeGreaterThan(yesterdayAt)
   })
 })
+
+describe('renderSnapshot write-guard escalation', () => {
+  const WARNING = /Memory Write Backlog/i
+  const DUTY = /End of every turn/i
+
+  it('omits the backlog warning when the guard is not due', () => {
+    store.add('memory', '[2026-09-12] global entry')
+    expect(renderSnapshot(store, { cwd })).not.toMatch(WARNING)
+  })
+
+  it('omits the warning when no writeGuard option is passed at all', () => {
+    store.add('memory', '[2026-09-12] global entry')
+    expect(renderSnapshot(store, { cwd }, {})).not.toMatch(WARNING)
+  })
+
+  it('injects the backlog warning once the guard is due', () => {
+    store.add('memory', '[2026-09-12] global entry')
+    expect(renderSnapshot(store, { cwd }, { writeGuard: { threshold: 2 } })).toMatch(WARNING)
+  })
+
+  it('renders the warning before the discipline note and keeps that note last, exactly once', () => {
+    store.add('memory', '[2026-09-12] global entry')
+    const text = renderSnapshot(store, { cwd }, { writeGuard: { threshold: 2 } })
+    const warnAt = text.search(WARNING)
+    const dutyAt = text.search(DUTY)
+    expect(warnAt).toBeGreaterThan(-1)
+    expect(dutyAt).toBeGreaterThan(warnAt)
+    // The end-of-turn note is the snapshot's final instruction — the warning
+    // must not displace it, and repeated rendering must not duplicate it.
+    expect(text.indexOf('End of every turn')).toBe(text.lastIndexOf('End of every turn'))
+    expect(text.trimEnd().endsWith('bounded, max 8).')).toBe(true)
+  })
+
+  it('names the guarded tracks and the configured threshold, with no live count', () => {
+    store.add('memory', '[2026-09-12] global entry')
+    const text = renderSnapshot(store, { cwd }, { writeGuard: { threshold: 3 } })
+    expect(text).toContain('daily/project')
+    expect(text).toMatch(/\b3\b/)
+    // Static text is the cache contract: an open gap costs two tail snapshots
+    // (appear, then disappear), so identical inputs must render identical bytes.
+    expect(renderSnapshot(store, { cwd }, { writeGuard: { threshold: 3 } })).toBe(text)
+  })
+
+  it('never leaks a template brace through the warning', () => {
+    store.add('memory', '[2026-09-12] global entry')
+    const text = renderSnapshot(store, { cwd }, { writeGuard: { threshold: 2 } })
+    expect(text).not.toContain('{{')
+  })
+
+  it('still renders the discipline note alone when the store is empty and the guard is due', () => {
+    const text = renderSnapshot(store, { cwd: null }, { writeGuard: { threshold: 2 } })
+    expect(text).toMatch(WARNING)
+    expect(text.indexOf('End of every turn')).toBe(text.lastIndexOf('End of every turn'))
+  })
+})
+
+describe('renderSnapshot subagent gating', () => {
+  it('replaces the per-turn duty with the per-achievement cadence', () => {
+    const text = renderSnapshot(store, { cwd, isSubagent: true })
+    expect(text).toMatch(/independent achievement/i)
+    expect(text).toMatch(/do not write for writing's sake/i)
+    // The per-turn cadence belongs to human-facing sessions only.
+    expect(text).not.toMatch(/End of every turn/i)
+    expect(text).not.toMatch(/dtodo list/i)
+  })
+
+  it('leaves the human-facing discipline note untouched when not a subagent', () => {
+    const text = renderSnapshot(store, { cwd, isSubagent: false })
+    expect(text).toMatch(/End of every turn/i)
+    expect(text).not.toMatch(/independent achievement/i)
+  })
+
+  it('defaults to the human-facing note when isSubagent is absent', () => {
+    expect(renderSnapshot(store, { cwd })).toMatch(/End of every turn/i)
+  })
+
+  it('still injects the shared memory context for a subagent', () => {
+    store.add('memory', '[2026-09-12] global-entry')
+    store.add('user', '[2026-09-12] user-entry')
+    store.add('key', '[2026-09-12] key-entry', cwd)
+    store.add('project', '[2026-09-12] project-entry', cwd)
+    const text = renderSnapshot(store, { cwd, isSubagent: true })
+    expect(text).toContain('global-entry')
+    expect(text).toContain('user-entry')
+    expect(text).toContain('key-entry')
+    expect(text).toContain('Project Context')
+  })
+
+  it('never renders the write backlog alert for a subagent, even when asked', () => {
+    const text = renderSnapshot(store, { cwd, isSubagent: true }, { writeGuard: { threshold: 2 } })
+    expect(text).not.toMatch(/Memory Write Backlog/i)
+  })
+
+  it('keeps the subagent note last, exactly once, and brace-free', () => {
+    store.add('memory', '[2026-09-12] global entry with {brace}')
+    const text = renderSnapshot(store, { cwd, isSubagent: true })
+    expect(text).not.toContain('{{')
+    expect((text.match(/Turn end \(subagent session\)/g) || []).length).toBe(1)
+    expect(text.trimEnd().endsWith('The per-turn daily cadence applies to human-facing sessions only.')).toBe(true)
+  })
+})

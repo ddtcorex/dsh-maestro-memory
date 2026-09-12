@@ -10,6 +10,12 @@ export interface SnapshotContext {
   branch?: string
   sessionId?: string
   sessionName?: string
+  /**
+   * True for a subagent session (`session.header.origin === 'subagent'`).
+   * Subagents deliver to a parent session, not to the human, so they get the
+   * per-achievement cadence instead of the per-turn one.
+   */
+  isSubagent?: boolean
 }
 
 /** Default per-section byte budgets for the snapshot prompt. */
@@ -20,6 +26,11 @@ export type SnapshotSectionKey = keyof typeof SNAPSHOT_SECTION_CAPS
 export interface SnapshotRenderOpts {
   /** Partial override of {@link SNAPSHOT_SECTION_CAPS}; unspecified sections keep defaults. */
   caps?: Partial<Record<SnapshotSectionKey, number>>
+  /**
+   * Set only while the per-turn write watchdog is due for this session. The
+   * caller owns the gap counter; the renderer only renders the escalation.
+   */
+  writeGuard?: { threshold: number } | null
 }
 
 const SECTION_SEP = '\n---\n'
@@ -169,12 +180,40 @@ export function renderSnapshot(
   // Conditional to avoid idle loops: only when turn produced meaningful progress.
   // Updated 2026-09-05: reality is daily-only (project MEMORY.md stays timeline-log, not entries);
   // durable decisions go through memory_suggest target=key, not memory add.
-  const discipline =
-    `---\nEnd of every turn — if this turn produced meaningful progress (code, decisions, learnings, or next steps): 1. Write daily via memory entries (daily in one call, skip if idle/waiting or no new information — never write entries containing only 'Idle' or placeholders). 2. For important project decisions (convention, incident, infra) use memory_suggest target=key with reason, not memory add. 3. Check dtodo list only if relevant (bounded, max 8).`
+  // Subagent sessions get a restrained per-achievement cadence instead: they
+  // report to a parent session rather than to the human, and a per-turn duty
+  // under bulk delegation would flood the tracks.
+  const discipline = ctx.isSubagent
+    ? SUBAGENT_TURN_END
+    : `---\nEnd of every turn — if this turn produced meaningful progress (code, decisions, learnings, or next steps): 1. Write daily via memory entries (daily in one call, skip if idle/waiting or no new information — never write entries containing only 'Idle' or placeholders). 2. For important project decisions (convention, incident, infra) use memory_suggest target=key with reason, not memory add. 3. Check dtodo list only if relevant (bounded, max 8).`
   // Defensive: strip any pre-existing discipline entry (should never occur — parts is fresh per call)
   // then append exactly once so the note is guaranteed last even for empty stores or repeated calls.
   const deduped = parts.filter((p) => p !== discipline)
+  // Write watchdog escalation, placed immediately before the discipline note so
+  // the note stays the snapshot's final instruction. The text is deliberately
+  // static — the threshold comes from configuration, never from the live gap —
+  // so one open gap costs at most two tail snapshots (appear, then disappear).
+  // Never rendered for a subagent: the per-turn duty is not theirs to pay.
+  if (opts.writeGuard && !ctx.isSubagent) deduped.push(renderWriteBacklog(opts.writeGuard.threshold))
   deduped.push(discipline)
 
   return neutralizePromptBraces(deduped.join('\n\n'))
+}
+
+/**
+ * Turn-end instruction for subagent sessions. Mirrors the human-facing note's
+ * intent at the cadence a subagent actually has: one entry per independent
+ * achievement, nothing when there is nothing to report.
+ */
+const SUBAGENT_TURN_END = `---
+Turn end (subagent session) — only after completing an independent achievement (a substantive deliverable, a key decision, or a pitfall conclusion), write ONE concise entry with a single memory add; for important conclusions use memory_suggest target=key with reason. Skip entirely when there is no independent achievement — do not write for writing's sake. The per-turn daily cadence applies to human-facing sessions only.`
+
+/**
+ * Sticky backlog alert emitted while the per-turn write watchdog is tripped.
+ * Names only the guarded tracks so it can never order a write to a track the
+ * human disabled.
+ */
+function renderWriteBacklog(threshold: number): string {
+  return `# ⚠️ Memory Write Backlog
+This session has gone ${threshold}+ consecutive turns with no daily/project memory write. Before this turn ends, catch up in ONE memory call — action=add with an entries[] array holding one item per track, condensing the missed turns into 1-2 lines each — then resume the one-entry-per-turn rhythm.`
 }

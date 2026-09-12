@@ -17,7 +17,7 @@ const RPC_CHANNEL = '/dsh-maestro-memory'
 //   Best For: tooling dashboards, memory/queue CRUD
 //   Performance: cost:low | Accessibility: risk:low
 // COLORS: all via DSH --dsw-alias-* tokens (light/dark auto-flip)
-//   Primary: #06c (brand fill, white text) Secondary: var(--dsw-alias-interactive-bg-active)
+//   Primary: var(--dsw-alias-button-primary-fill|-hover) + label-primary-foreground (Button.module.css recipe)
 //   Background: var(--dsw-alias-bg-base/layer-1/layer-2) Text: label-primary/secondary
 //   Success: state-success-primary  Error: state-error-primary  Warn: state-warn-primary
 //   Notes: contrast 4.5:1 verified via host tokens; brand fill keeps white text in both themes
@@ -25,6 +25,9 @@ const RPC_CHANNEL = '/dsh-maestro-memory'
 //   Mood: professional, readable  Google Fonts: inherit
 // KEY EFFECTS: hover 150ms, focus ring 2px, active translateY .5px, card hover border-l2
 // AVOID: neon gradients, emoji-as-icon, no focus ring, hardcoded light hex
+//   Exception: #fff stays literal as the foreground on state-error-primary fills
+//   (badges, .memx-btn-danger). DSH exposes no on-error foreground token, and
+//   label-primary-foreground could invert under a light-fill theme and break contrast.
 // PRE-DELIVERY: [x] 8 items — tokens, cursor-pointer, focus-visible, reduced-motion, contrast,
 //               reflow 375/200%, responsive 375/768/1024/1440, touch 44pt+8gap, alt/label
 // ───────────────────────────────────────────────────────────────────
@@ -96,16 +99,24 @@ const MEM_CSS = `
 .memx-pill:hover { color:var(--dsw-alias-label-primary); border-color:var(--dsw-alias-border-l2); }
 .memx-pill[aria-pressed="true"] { background:var(--dsw-alias-interactive-bg-active); color:var(--dsw-alias-label-primary); font-weight:600; border-color:var(--dsw-alias-border-l2); }
 .memx-field { display:flex; gap:8px; align-items:center; flex-wrap:wrap; flex:1 1 100%; min-width:0; }
+.memx-composer { display:flex; gap:8px; align-items:flex-end; flex-wrap:wrap; min-width:0; }
+.memx-composer .memx-textarea { flex:1 1 220px; min-width:0; }
+.memx-composer .memx-btn { align-self:stretch; }
+@media (max-width:480px) { .memx-composer { flex-direction:column; align-items:stretch; } .memx-composer .memx-textarea { flex-basis:auto; width:100%; } }
 .memx-input { height:44px; padding:0 10px; flex:1 1 140px; min-width:0; }
 @media (max-width:480px) { .memx-field { flex-direction:column; align-items:stretch; } .memx-input { flex-basis:auto; width:100%; } }
 .memx-input:disabled { opacity:.5; cursor:not-allowed; }
 .memx-btn { min-height:44px; padding:0 14px; border-radius:8px; border:1px solid var(--dsw-alias-border-l1); background:var(--dsw-alias-bg-layer-1); color:var(--dsw-alias-label-primary); display:inline-flex; align-items:center; justify-content:center; gap:6px; font-weight:500; }
-.memx-btn:hover { border-color:var(--dsw-alias-border-l2); background:var(--dsw-alias-bg-layer-2); }
-.memx-btn-primary { background:#06c; color:#fff; border-color:#06c; }
-.memx-btn-primary:hover { background:#05a; border-color:#05a; color:#fff; }
+.memx-btn:hover:not(:disabled) { border-color:var(--dsw-alias-border-l2); background:var(--dsw-alias-bg-layer-2); }
+.memx-btn-primary { background:var(--dsw-alias-button-primary-fill); color:var(--dsw-alias-label-primary-foreground); border-color:var(--dsw-alias-button-primary-fill); }
+.memx-btn-primary:hover:not(:disabled) { background:var(--dsw-alias-button-primary-hover); border-color:var(--dsw-alias-button-primary-hover); color:var(--dsw-alias-label-primary-foreground); }
 .memx-btn-ghost { background:transparent; }
 .memx-btn-danger { background:var(--dsw-alias-state-error-primary); color:#fff; border-color:transparent; }
 .memx-btn:disabled { opacity:.5; cursor:not-allowed; }
+/* Live status region: always mounted so assistive tech registers it before it
+ * has anything to announce. Empty, it leaves the flex flow (absolute) yet stays
+ * in the accessibility tree; display:none would silence it. */
+.memx-status:empty { position:absolute; width:1px; height:1px; margin:0; padding:0; border:0; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
 
 /* bento / cards */
 .memx-grid { display:grid; gap:10px; width:100%; max-width:100%; min-width:0; }
@@ -447,7 +458,12 @@ function MemoryListView({ ctx }: {ctx:any}): React.ReactElement {
   const [loading,setLoading]=React.useState(true)
   const [msg,setMsg]=React.useState('')
   const [q,setQ]=React.useState('')
+  // Drafts are bucketed per track: switching tabs must not discard typed text.
+  const [drafts,setDrafts]=React.useState<Record<string,string>>({})
+  const [saving,setSaving]=React.useState(false)
   const needsCwd=track==='key'||track==='project'
+  const draft=drafts[track]??''
+  const canAdd=draft.trim().length>0 && (!needsCwd || cwd.trim().length>0) && !saving
   const load=React.useCallback(async()=>{
     setLoading(true); setMsg('')
     try{
@@ -457,6 +473,24 @@ function MemoryListView({ ctx }: {ctx:any}): React.ReactElement {
     } catch(e:any){ setMsg(`load failed: ${e?.message??String(e)}`) } finally{ setLoading(false) }
   },[rpc,track,cwd,needsCwd])
   React.useEffect(()=>{ load() },[load])
+
+  // Manual add — a human recording a durable fact needs no model-side gate
+  // (the key gate is exec.agent-scoped on the host and stays in force there).
+  const addEntry=React.useCallback(async()=>{
+    const content=draft.trim()
+    if(!content){ setMsg('content required'); return }
+    if(needsCwd && !cwd.trim()){ setMsg('cwd required for key/project'); return }
+    setSaving(true); setMsg('')
+    try{
+      const res:any=await rpc('memory.mutate',{ action:'add', target:track, cwd: needsCwd?cwd.trim():undefined, content })
+      if(res && res.ok===false){ setMsg(`add failed: ${res.error??'unknown error'}`) }
+      else{
+        setDrafts(prev=>({...prev,[track]:''}))
+        setMsg(`added to ${track}`)
+        await load()
+      }
+    } catch(e:any){ setMsg(`add failed: ${e?.message??String(e)}`) } finally{ setSaving(false) }
+  },[rpc,track,cwd,needsCwd,draft,load])
 
   const filtered=React.useMemo(()=>{
     const t=q.trim().toLowerCase(); if(!t) return entries
@@ -472,7 +506,11 @@ function MemoryListView({ ctx }: {ctx:any}): React.ReactElement {
       ),
       React.createElement('div',{className:'memx-search', role:'search', 'aria-label':'Filter entries', style:{maxWidth:240}}, React.createElement(Ico,{d:ICO.search}), React.createElement('input',{value:q, onChange:(e:any)=>setQ(e.target.value), placeholder:'Filter entries…', 'aria-label':'Filter entries'})),
     ),
-    msg?React.createElement('div',{className:'memx-muted'},msg):null,
+    React.createElement('div',{className:'memx-composer'},
+      React.createElement('textarea',{value:draft, onChange:(e:any)=>setDrafts(prev=>({...prev,[track]:e.target.value})), placeholder:`Add an entry to ${track}…`, 'aria-label':`New ${track} entry`, 'data-testid':'mem-add-content', className:'memx-textarea', rows:2, disabled:saving}),
+      React.createElement('button',{onClick:addEntry, disabled:!canAdd, className:'memx-btn memx-btn-primary', 'data-testid':'mem-add-btn', 'aria-label':'Add entry'}, saving?'Saving…':'Add'),
+    ),
+    React.createElement('div',{className:'memx-muted memx-status', role:'status', 'aria-live':'polite'}, msg),
     loading ? React.createElement('div',{className:'memx-muted'},'Loading memory…') : filtered.length===0 ? React.createElement('div',{className:'memx-empty'}, '(no entries)') :
       React.createElement('div',null,
         React.createElement('div',{className:'memx-muted', style:{marginBottom:6}}, `${filtered.length}/${entries.length} entries`),

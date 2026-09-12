@@ -37,6 +37,7 @@ function fakeCtx(memoryDir: string) {
       },
     },
     effect: (fn: any) => { const d = fn(); return d },
+    on: () => () => {},
     get: (name: string) => (name === 'connection' ? ctx.connection : undefined),
     state: { tools, rpcHandlers },
   }
