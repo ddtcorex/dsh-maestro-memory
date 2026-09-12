@@ -55,8 +55,7 @@ export function applyBatch(
   store: MaestroMemoryStore,
   entries: BatchEntryInput[],
 ): BatchResult {
-  const added: { target: MemoryTarget; token: string; cwd?: string; date?: string }[] = []
-  const addedEntries: { index: number; target: MemoryTarget }[] = []
+  const added: { index: number; target: MemoryTarget; token: string; cwd?: string; date?: string }[] = []
   const ids: (string | undefined)[] = []
 
   for (let i = 0; i < entries.length; i++) {
@@ -89,8 +88,8 @@ export function applyBatch(
     ids.push(res.id)
     // Duplicates carry no id and did not modify storage — nothing to roll back.
     if (!res.duplicate) {
-      addedEntries.push({ index: i, target: target as MemoryTarget })
       added.push({
+        index: i,
         target: target as MemoryTarget,
         // key entries carry a generated id token; other tracks are stored
         // verbatim, so the trimmed stored content is the precise removal token.
@@ -100,12 +99,12 @@ export function applyBatch(
       })
     }
   }
-  return { ok: true, ids, added: addedEntries }
+  return { ok: true, ids, added: added.map(({ index, target }) => ({ index, target })) }
 }
 
 function fail(
   store: MaestroMemoryStore,
-  added: { target: MemoryTarget; token: string; cwd?: string; date?: string }[],
+  added: { index: number; target: MemoryTarget; token: string; cwd?: string; date?: string }[],
   index: number,
   error: string,
 ): BatchResult {
