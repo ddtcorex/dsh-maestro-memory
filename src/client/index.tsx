@@ -96,6 +96,11 @@ const MEM_CSS = `
 .memx-pill:hover { color:var(--dsw-alias-label-primary); border-color:var(--dsw-alias-border-l2); }
 .memx-pill[aria-pressed="true"] { background:var(--dsw-alias-interactive-bg-active); color:var(--dsw-alias-label-primary); font-weight:600; border-color:var(--dsw-alias-border-l2); }
 .memx-field { display:flex; gap:8px; align-items:center; flex-wrap:wrap; flex:1 1 100%; min-width:0; }
+.memx-composer { display:flex; gap:8px; align-items:flex-end; flex-wrap:wrap; min-width:0; }
+.memx-composer .memx-textarea { flex:1 1 220px; min-width:0; }
+.memx-composer .memx-btn { align-self:stretch; }
+@media (max-width:480px) { .memx-composer { flex-direction:column; align-items:stretch; } .memx-composer .memx-textarea { flex-basis:auto; width:100%; } }
+.memx-btn:disabled { opacity:.5; cursor:not-allowed; }
 .memx-input { height:44px; padding:0 10px; flex:1 1 140px; min-width:0; }
 @media (max-width:480px) { .memx-field { flex-direction:column; align-items:stretch; } .memx-input { flex-basis:auto; width:100%; } }
 .memx-input:disabled { opacity:.5; cursor:not-allowed; }
@@ -447,7 +452,12 @@ function MemoryListView({ ctx }: {ctx:any}): React.ReactElement {
   const [loading,setLoading]=React.useState(true)
   const [msg,setMsg]=React.useState('')
   const [q,setQ]=React.useState('')
+  // Drafts are bucketed per track: switching tabs must not discard typed text.
+  const [drafts,setDrafts]=React.useState<Record<string,string>>({})
+  const [saving,setSaving]=React.useState(false)
   const needsCwd=track==='key'||track==='project'
+  const draft=drafts[track]??''
+  const canAdd=draft.trim().length>0 && (!needsCwd || cwd.trim().length>0) && !saving
   const load=React.useCallback(async()=>{
     setLoading(true); setMsg('')
     try{
@@ -457,6 +467,24 @@ function MemoryListView({ ctx }: {ctx:any}): React.ReactElement {
     } catch(e:any){ setMsg(`load failed: ${e?.message??String(e)}`) } finally{ setLoading(false) }
   },[rpc,track,cwd,needsCwd])
   React.useEffect(()=>{ load() },[load])
+
+  // Manual add — a human recording a durable fact needs no model-side gate
+  // (the key gate is exec.agent-scoped on the host and stays in force there).
+  const addEntry=React.useCallback(async()=>{
+    const content=draft.trim()
+    if(!content){ setMsg('content required'); return }
+    if(needsCwd && !cwd.trim()){ setMsg('cwd required for key/project'); return }
+    setSaving(true); setMsg('')
+    try{
+      const res:any=await rpc('memory.mutate',{ action:'add', target:track, cwd: needsCwd?cwd.trim():undefined, content })
+      if(res && res.ok===false){ setMsg(`add failed: ${res.error??'unknown error'}`) }
+      else{
+        setDrafts(prev=>({...prev,[track]:''}))
+        setMsg(`added to ${track}`)
+        await load()
+      }
+    } catch(e:any){ setMsg(`add failed: ${e?.message??String(e)}`) } finally{ setSaving(false) }
+  },[rpc,track,cwd,needsCwd,draft,load])
 
   const filtered=React.useMemo(()=>{
     const t=q.trim().toLowerCase(); if(!t) return entries
@@ -471,6 +499,10 @@ function MemoryListView({ ctx }: {ctx:any}): React.ReactElement {
         React.createElement('button',{onClick:load, className:'memx-btn', 'data-testid':'mem-refresh'}, React.createElement(Ico,{d:ICO.refresh, size:14}), 'Refresh'),
       ),
       React.createElement('div',{className:'memx-search', role:'search', 'aria-label':'Filter entries', style:{maxWidth:240}}, React.createElement(Ico,{d:ICO.search}), React.createElement('input',{value:q, onChange:(e:any)=>setQ(e.target.value), placeholder:'Filter entries…', 'aria-label':'Filter entries'})),
+    ),
+    React.createElement('div',{className:'memx-composer'},
+      React.createElement('textarea',{value:draft, onChange:(e:any)=>setDrafts(prev=>({...prev,[track]:e.target.value})), placeholder:`Add an entry to ${track}…`, 'aria-label':`New ${track} entry`, 'data-testid':'mem-add-content', className:'memx-textarea', rows:2, disabled:saving}),
+      React.createElement('button',{onClick:addEntry, disabled:!canAdd, className:'memx-btn memx-btn-primary', 'data-testid':'mem-add-btn', 'aria-label':'Add entry'}, saving?'Saving…':'Add'),
     ),
     msg?React.createElement('div',{className:'memx-muted'},msg):null,
     loading ? React.createElement('div',{className:'memx-muted'},'Loading memory…') : filtered.length===0 ? React.createElement('div',{className:'memx-empty'}, '(no entries)') :
