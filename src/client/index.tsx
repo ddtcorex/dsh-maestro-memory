@@ -633,7 +633,7 @@ function MemoryView({ ctx }: {ctx:any}): React.ReactElement {
   const tabs: Array<{id:typeof tab; label:string; icon:string; count?:number}> = [
     {id:'memory', label:'Memory', icon:ICO.mem},
     {id:'review', label:'Queue', icon:ICO.inbox, count:pending},
-    {id:'todos', label:'Todos', icon:ICO.check},
+    {id:'todos', label:'Todo store', icon:ICO.check},
     {id:'skills', label:'Skills', icon:ICO.layers},
     {id:'health', label:'Health', icon:ICO.activity},
   ]

@@ -221,7 +221,7 @@ Todo entry format (auto-maintained by the program, do not edit the structure man
 - Entries are delimited by §; the comment block before the first § is the format note, not a todo
 - The first line of each todo is the metadata tag line (fixed order, optional parts may be omitted):
   [created time] auto-stamped by the program (e.g. [2026-08-06 21:30])
-  [id: 8-hex] unique identifier for the entry, operated by the dtodo tool
+  [id: 8-hex] unique identifier for the entry, operated by the maestro_todo tool
   [q1] important & urgent  [q2] important not urgent  [q3] urgent not important  [q4] not important not urgent (default = unclassified)
   [due: YYYY-MM-DD] due date (default = none)
   [status: pending|doing|done|blocked|cancelled] status (default pending)

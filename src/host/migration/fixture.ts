@@ -9,7 +9,7 @@ import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { createHash } from 'node:crypto'
 
-const COMPAT_TOOLS = ['memory', 'dtodo', 'skill_manage', 'memory_suggest', 'memory_review_status'] as const
+const COMPAT_TOOLS = ['memory', 'maestro_todo', 'skill_manage', 'memory_suggest', 'memory_review_status'] as const
 type CompatTool = typeof COMPAT_TOOLS[number]
 
 /**
@@ -19,7 +19,7 @@ type CompatTool = typeof COMPAT_TOOLS[number]
  */
 const KNOWN_OWNERS: Record<string, string[]> = {
   memory: ['@ddtcorex/dsh-maestro-memory'],
-  dtodo: ['@ddtcorex/dsh-maestro-memory'],
+  maestro_todo: ['@ddtcorex/dsh-maestro-memory'],
   skill_manage: [], // optional module, not owned by default
   memory_suggest: ['@ddtcorex/dsh-maestro-memory'],
   memory_review_status: ['@ddtcorex/dsh-maestro-memory'],
@@ -169,7 +169,7 @@ function writeLegacyMemory(file: string, entries: string[]) {
 }
 
 function writeTodoFile(file: string, entriesRaw: string[]) {
-  const header = `<!--\nTodo entry format (auto-maintained by the program, do not edit the structure manually):\n- Entries are delimited by §; the comment block before the first § is the format note, not a todo\n- The first line of each todo is the metadata tag line (fixed order, optional parts may be omitted):\n  [created time] auto-stamped by the program (e.g. [2026-08-06 21:30])\n  [id: 8-hex] unique identifier for the entry, operated by the dtodo tool\n  [q1] important & urgent  [q2] important not urgent  [q3] urgent not important  [q4] not important not urgent (default = unclassified)\n  [due: YYYY-MM-DD] due date (default = none)\n  [status: pending|doing|done|blocked|cancelled] status (default pending)\n  [done: YYYY-MM-DD HH:MM] completion time (auto-stamped, only for done status)\n  [cat: category] optional (life/work/study...)\n- Todo content follows the first tag line and may span multiple lines\n-->\n`
+  const header = `<!--\nTodo entry format (auto-maintained by the program, do not edit the structure manually):\n- Entries are delimited by §; the comment block before the first § is the format note, not a todo\n- The first line of each todo is the metadata tag line (fixed order, optional parts may be omitted):\n  [created time] auto-stamped by the program (e.g. [2026-08-06 21:30])\n  [id: 8-hex] unique identifier for the entry, operated by the maestro_todo tool\n  [q1] important & urgent  [q2] important not urgent  [q3] urgent not important  [q4] not important not urgent (default = unclassified)\n  [due: YYYY-MM-DD] due date (default = none)\n  [status: pending|doing|done|blocked|cancelled] status (default pending)\n  [done: YYYY-MM-DD HH:MM] completion time (auto-stamped, only for done status)\n  [cat: category] optional (life/work/study...)\n- Todo content follows the first tag line and may span multiple lines\n-->\n`
   const body = entriesRaw.join('\n§\n')
   const text = `${header}${body.length > 0 ? `\n§\n${body}\n` : ''}`
   mkdirSync(dirname(file), { recursive: true })

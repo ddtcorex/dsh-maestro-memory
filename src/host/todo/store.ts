@@ -465,7 +465,7 @@ export class TodoStore {
       return `- ${tags.join(' ')} ${text} (id: ${it.id})`
     })
     const h = hint ? `\n${hint}` : ''
-    return `${head}\n${lines.join('\n')}\ntag semantics: q1-q4 = quadrants (important x urgent); due = deadline; status = state; operate by id (dtodo done/update/remove <id>, may include target=).${h}`
+    return `${head}\n${lines.join('\n')}\ntag semantics: q1-q4 = quadrants (important x urgent); due = deadline; status = state; operate by id (maestro_todo done/update/remove <id>, may include target=).${h}`
   }
 }
 

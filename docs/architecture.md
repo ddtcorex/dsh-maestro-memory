@@ -6,7 +6,7 @@
 
 - **Package:** `@ddtcorex/dsh-maestro-memory` (`cordis.patch.yml` id `maestro-memory`)
 - **Install:** `dsh plugin --profile web add link:<workspace-root>/packages/dsh-maestro-memory` (dev) or `github:ddtcorex/dsh-maestro-memory#<sha>` (prod — pin to exact SHA, branch tarballs are stale per `AGENTS.md` pnpm pitfall)
-- **Profile rule:** exactly one owner for each compatibility tool (`memory`/`dtodo`/`memory_suggest`); do not keep `dsh-memory-evolve` and `dsh-maestro-memory` in the same profile
+- **Profile rule:** exactly one owner for each compatibility tool (`memory`/`maestro_todo`/`memory_suggest`); do not keep `dsh-memory-evolve` and `dsh-maestro-memory` in the same profile
 
 ## 2. Host — Cordis seams (M0 audit)
 
@@ -14,12 +14,12 @@ All registrations are via `ctx.effect(() => disposer, label)` so `stop`/`update`
 
 | Seam | How we use it | Signature (as shipped) | Notes |
 |---|---|---|---|
-| `ctx.tools.register` | `memory`, `dtodo`, `memory_suggest`, `memory_review_status` (+ `skill_manage` only when the optional skills module is explicitly enabled) | `ctx.effect(() => ctx.tools.register(defineTool({name, description, parameters, execute})), 'maestro-memory: tool')` | Content output via `CONTENT_OUTPUT` schema `{content:{type:array,required:true}}` |
+| `ctx.tools.register` | `memory`, `maestro_todo`, `memory_suggest`, `memory_review_status` (+ `skill_manage` only when the optional skills module is explicitly enabled) | `ctx.effect(() => ctx.tools.register(defineTool({name, description, parameters, execute})), 'maestro-memory: tool')` | Content output via `CONTENT_OUTPUT` schema `{content:{type:array,required:true}}` |
 | `ctx.systemPrompt.context` | Bounded snapshot `USER + global MEMORY + current-project KEY` + session header + discipline note | `{name:'memory:snapshot', order: config.snapshotOrder ?? 500, text:(ctx)=>renderSnapshot(store,{cwd,branch,sessionId,sessionName})}` | `renderSnapshot` pure in `src/host/prompt/snapshot.ts`; `daily`/`project` logs never injected; branch-filtered via `store.list('key',cwd,{branch})` |
 | `ctx.connection.rpc.handle` | Package-private RPC `/dsh-maestro-memory` | `conn = ctx.connection ?? ctx.get('connection'); if (!conn?.rpc?.handle) no-op` | Endpoints: `queue.list/decide`, `memory.list/mutate`, `todo.list/mutate`, `status`, `migration.*`, `sync.*`, `skills.list` |
 | `ctx.workspaceRegistry` (injected) | Resolve `cwd` for project-hash isolation when `exec.agent.session.header.cwd` is absent | `inject = ['tools','systemPrompt','connection']` (workspaceRegistry available via `ctx.get`) | Hash = `sha1(cwd)[:12]` via `storage/layout.ts:projectHash` |
 
-Compatibility matrix (M0): no core owner for `memory`/`dtodo`/`memory_suggest` was found in `deepseek-harness/packages/todo/tool-todo` (owns only `todo_write`) or `skill/tool-skill` (owns `skill`). If DSH core later claims one of these names, rollout must pause and choose "configure-off in profile" or "narrow adapter" — do not shadow.
+Compatibility matrix (M0): no core owner for `memory`/`maestro_todo`/`memory_suggest` was found in `deepseek-harness/packages/todo/tool-todo` (owns only `todo_write`) or `skill/tool-skill` (owns `skill`). If DSH core later claims one of these names, rollout must pause and choose "configure-off in profile" or "narrow adapter" — do not shadow.
 
 ## 3. Storage & atomicity
 

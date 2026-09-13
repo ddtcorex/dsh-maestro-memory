@@ -49,6 +49,22 @@ export const DEFAULTS: Required<MaestroMemoryConfig> = {
   writeGuard: { ...DEFAULT_WRITE_GUARD },
 }
 
+/**
+ * Routing line for the two task systems one session can see. `todo_write` is the
+ * harness's in-session plan (whole-list replace, rendered by the Todos panel);
+ * `maestro_todo` is this plugin's durable cross-session store. Published on
+ * every turn because the two tool descriptions cannot see each other, and a
+ * model that has to guess puts the human's real todos in a throwaway list (or
+ * plans its own work into the human's store).
+ */
+export const TASK_SYSTEMS_NOTE =
+  '---\n'
+  + 'Task lists — two separate systems, never mix them: `todo_write` is THIS session\'s plan '
+  + '(ephemeral, replaces the whole list on every call, shown in the harness Todos panel). '
+  + '`maestro_todo` is the human\'s durable cross-session store (tracks life/work/project/daily, '
+  + 'ids, due, quadrant, status, smart views; survives restarts; shown in the Memory view\'s Todo store tab). '
+  + 'Plan your own work with `todo_write`; record or look up the human\'s real todos with `maestro_todo`.'
+
 /** Resolve the write-guard config, keeping the threshold a usable positive integer. */
 export function resolveWriteGuard(config?: WriteGuardConfig): Required<WriteGuardConfig> {
   const merged = { ...DEFAULT_WRITE_GUARD, ...(config ?? {}) }
@@ -156,6 +172,21 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
       if (typeof dispose === 'function') dispose()
     }
   }, 'maestro-memory: snapshot')
+
+  // The two task systems are named side by side on every turn (see
+  // TASK_SYSTEMS_NOTE): a durable-vs-session mix-up is a routing mistake the
+  // tool descriptions alone cannot prevent, because neither tool can see the
+  // other one's text.
+  ctx.effect(() => {
+    const dispose = ctx.systemPrompt.context({
+      name: 'memory:task-systems',
+      order,
+      text: () => TASK_SYSTEMS_NOTE,
+    })
+    return () => {
+      if (typeof dispose === 'function') dispose()
+    }
+  }, 'maestro-memory: task-systems')
 
   ctx.effect(() => {
     const tool = defineTool({
@@ -326,12 +357,15 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
     }
   }, 'maestro-memory: suggest-tool')
 
-  // dtodo compatibility tool (four tracks, IDs, status/due/quadrant, smart view, historical lookup)
+  // Durable todo store (four tracks, IDs, status/due/quadrant, smart view, historical daily
+  // lookup). Named `maestro_todo`, not `dtodo`: the old name read as another "Todos" tool
+  // next to the harness's own session task list (`todo_write`), and the description below
+  // now has to carry the contrast because the two tools cannot see each other's text.
   ctx.effect(() => {
     const tool = defineTool({
-      name: 'dtodo',
+      name: 'maestro_todo',
       isConcurrencySafe: (args: any) => String(args?.action ?? '') === 'list',
-      description: 'Todos: life/work/project/daily with IDs, status/due/quadrant, smart view (overdue/today/project/Q1-Q2, limit 8), historical daily lookup',
+      description: 'Durable cross-session todo store — the human\'s own list, NOT this session\'s plan. Tracks life/work/project/daily with ids, status/due/quadrant, smart views (overdue/today/project/Q1-Q2, limit 8) and historical daily lookup. To plan the current work use the harness tool `todo_write` instead.',
       parameters: {
         action: { type: 'string', required: true, enum: ['add', 'list', 'done', 'update', 'remove'] },
         target: { type: 'string', enum: [...TODO_TARGETS] },
@@ -351,7 +385,7 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
       },
       output: CONTENT_OUTPUT,
       execute: async (args: any, exec: any) => {
-        if (exec?.signal?.aborted) throw new Error('dtodo aborted')
+        if (exec?.signal?.aborted) throw new Error('maestro_todo aborted')
         const action = args.action as string
         const cwd: string | undefined = args.cwd ?? exec?.agent?.session?.header?.cwd
         const dateArg = (v: any) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined)
@@ -420,7 +454,7 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
     return () => {
       if (typeof dispose === 'function') dispose()
     }
-  }, 'maestro-memory: dtodo-tool')
+  }, 'maestro-memory: todo-tool')
 
   // RPC channel for Review queue — explicit user-click decisions
   ctx.effect(() => {
