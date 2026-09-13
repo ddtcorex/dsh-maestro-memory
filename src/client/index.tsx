@@ -159,6 +159,21 @@ const MEM_CSS = `
 @media (max-width:1023px) { .memx { padding:12px 12px calc(16px + env(safe-area-inset-bottom,0px)) !important; } .memx-layout { gap:12px; grid-template-columns:1fr !important; } .memx-formrow > *{ min-width:0; } }
 @media (max-width:480px) { .memx-field { flex-direction:column; align-items:stretch; } .memx-input { flex-basis:auto; width:100%; max-width:100%; } }
 @media (min-width:1440px) { .memx { max-width:1280px; margin:0 auto; } }
+
+/* iOS WebKit zoom guard — ride the field floor, do not fight it.
+   dsh-maestro-mobile holds EVERY text field at >=16px under
+   html[data-mobile-nav-ios] inside this exact predicate, because iOS Safari
+   magnifies the visual viewport when a focused field computes below 16px and
+   only reverts on blur. Those fields are chosen by the browser, not by us, so
+   our 13px body would leave the placeholders and the typed text 3px larger
+   than the cards and labels they sit between — the panel would stop reading as
+   one type scale. Raise the panel to the same 16px instead of pinning the
+   fields back down (which would restore the focus zoom). Engines without the
+   floor (desktop, touch-Android) are untouched: the floor's predicate and
+   marker are the mobile plugin's public contract, so both sides move together. */
+@media (max-width: 1023px) and (pointer: coarse) {
+  html[data-mobile-nav-ios] .memx { font-size:16px; }
+}
 `
 
 const HEADER_BADGE_CSS = `
