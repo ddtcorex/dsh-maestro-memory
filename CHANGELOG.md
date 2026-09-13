@@ -4,6 +4,42 @@ All notable changes to this project are documented in this file. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-09-14
+
+### Changed
+- **BREAKING — the durable todo tool is renamed `maestro_todo`** (#52). The tool
+  was `dtodo`, and there is no alias: any existing prompt, preset, or doc that
+  still refers to `dtodo` must be updated, or the durable store becomes
+  unreachable from it. Two different "Todos" reached the model in one session —
+  the harness's own in-session plan `todo_write` and this plugin's durable
+  cross-session store — and neither description said what it was *not*, so the
+  model had to guess: a real todo could land in a throwaway session list while
+  the agent's own plan landed in the human's store. The tool's description now
+  opens with what it is and names `todo_write`, a new `memory:task-systems`
+  prompt context names both systems on every turn, and the Memory view tab reads
+  `Todo store` instead of `Todos`.
+- **Docs corrected against the code** (#48, #49) — `lib/` is documented as
+  gitignored build output that has to be refreshed locally (a `link:` install
+  loads it from disk) rather than committed, and the hard-coded suite counts are
+  gone from `AGENTS.md`, `CONTRIBUTING.md`, and `README.md`: a count written
+  into a doc goes stale on the very next test.
+
+### Fixed
+- **The Memory tab keeps its own 13px scale on iOS** (#51, correcting #50) — the
+  mobile plugin holds every text field on the page at a 16px floor under
+  `html[data-mobile-nav-ios]`, which left the tab's placeholders and typed text
+  3px larger than the cards and labels around them. The panel now opts its own
+  `input`/`textarea`/`select` out of that floor instead of raising the whole
+  panel to 16px. Accepted trade-off: iOS magnifies the visual viewport while one
+  of these fields has focus — the behaviour the floor exists to prevent. Desktop
+  and touch-Android were never affected and keep the 13px design.
+
+### Removed
+- **`storage/legacy-format.ts`** (#53) — a duplicate left over from before the
+  `src/host` reorg: nothing imported it, and both tsconfigs compile only
+  `src/host/**` and `src/client/**`, so it was dead code that still carried a
+  stale copy of the entry grammar (including the retired tool name).
+
 ## [1.3.0] - 2026-09-12
 
 ### Added

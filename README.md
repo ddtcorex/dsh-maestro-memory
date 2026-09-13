@@ -5,7 +5,7 @@ Durable memory and todos for DeepSeek Harness (DSH) — preserves `~/.dsh/memori
 > Give the AI cross-session durable memory and todos — the more you use it, the more it understands you.
 
 - **Package:** `@ddtcorex/dsh-maestro-memory` (`cordis.patch.yml` id `maestro-memory`)
-- **Version:** `1.3.0` · **Changelog:** `CHANGELOG.md`
+- **Version:** `2.0.0` · **Changelog:** `CHANGELOG.md`
 
 ## Requirements
 
