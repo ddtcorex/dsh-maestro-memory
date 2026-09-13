@@ -25,7 +25,7 @@ Part of the Maestro Harness suite (installed as a DSH plugin). Originally forked
 - `src/client/index.tsx` — browser half (Memory view, Sync tab, Review queue UI).
 - `lib/` — gitignored build output. Generated; do not hand-edit, never commit.
 - `scripts/build-client.mjs` — client bundle builder.
-- `tests/*.spec.ts` — vitest suites (26 files, 341 tests).
+- `tests/*.spec.ts` — vitest suites.
 
 ## Development
 
