@@ -17,7 +17,7 @@ Durable memory and todos for DeepSeek Harness (DSH) — preserves `~/.dsh/memori
 ```sh
 pnpm install
 pnpm run build   # -> lib/
-pnpm test        # 341 tests
+pnpm test        # vitest run
 ```
 
 **DSH profile (operator):**
