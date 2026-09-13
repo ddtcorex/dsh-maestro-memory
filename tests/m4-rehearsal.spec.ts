@@ -37,7 +37,7 @@ describe('M4-PR-A rehearsal: fixture profile with link: package/patch and one ow
       const result = await assertSingleOwner(profileDir)
       expect(result.ok).toBe(true)
       expect(result.owners['memory']).toBe('@ddtcorex/dsh-maestro-memory')
-      expect(result.owners['dtodo']).toBe('@ddtcorex/dsh-maestro-memory')
+      expect(result.owners['maestro_todo']).toBe('@ddtcorex/dsh-maestro-memory')
       // skill_manage is optional — if present, also single owner, else not listed
       if (result.owners['skill_manage']) {
         expect(result.owners['skill_manage']).toBe('@ddtcorex/dsh-maestro-memory')
@@ -75,7 +75,7 @@ describe('M4-PR-A rehearsal: fixture profile with link: package/patch and one ow
       const result = await assertSingleOwner(profileDir, {
         toolOwners: {
           memory: ['@ddtcorex/dsh-maestro-memory', 'some-other-memory'],
-          dtodo: ['@ddtcorex/dsh-maestro-memory'],
+          maestro_todo: ['@ddtcorex/dsh-maestro-memory'],
         },
       })
       expect(result.ok).toBe(false)
@@ -181,7 +181,7 @@ describe('M4-PR-A rehearsal: profile reload, live reads, one write against copie
     const ctx1 = fakeCtx(root)
     apply(ctx1, { memoryDir: root })
     expect(ctx1.state.tools.find((t: any) => t.name === 'memory')).toBeDefined()
-    expect(ctx1.state.tools.find((t: any) => t.name === 'dtodo')).toBeDefined()
+    expect(ctx1.state.tools.find((t: any) => t.name === 'maestro_todo')).toBeDefined()
 
     // live reads via stores against copied schema
     const { MaestroMemoryStore } = await import('../src/host/memory/store.ts')

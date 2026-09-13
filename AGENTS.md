@@ -12,7 +12,7 @@ Part of the Maestro Harness suite (installed as a DSH plugin). Originally forked
 
 ## Layout
 
-- `src/host/index.ts` — host `apply()`: registers the `memory` + `memory_suggest` + `dtodo` tools, the `memory:snapshot` systemPrompt context (order `snapshotOrder ?? 500`), and the `/dsh-maestro-memory` RPC channel (loopback authority).
+- `src/host/index.ts` — host `apply()`: registers the `memory` + `memory_suggest` + `maestro_todo` tools, the `memory:snapshot` and `memory:task-systems` systemPrompt contexts (order `snapshotOrder ?? 500`), and the `/dsh-maestro-memory` RPC channel (loopback authority).
 - `src/host/memory/store.ts` — `MaestroMemoryStore` over five tracks (`memory`/`user`/`project`/`key`/`daily`): add/list/replace/remove/archive/expand + `snapshot`.
 - `src/host/todo/store.ts` — `TodoStore` (four tracks, quadrant/due/status, smart view).
 - `src/host/prompt/snapshot.ts` — `renderSnapshot(store, ctx, opts)`: bounded snapshot (USER + MEMORY + KEY + Project Context auto-recall + bounded Recent Daily + REFERENCE slice) with session header, the end-of-turn discipline note, the optional write-backlog alert, and the subagent cadence variant.
@@ -48,13 +48,15 @@ pnpm build    # tsc host + client && node scripts/build-client.mjs  -> lib/
 
 ## Conventions
 
+- **Tool names must not collide with the harness's own tools.** The durable todo store is `maestro_todo` (never `dtodo`): the harness ships `todo_write`, an in-session whole-list plan, and a plugin tool whose name and description both read as "Todos" makes the model guess which system the human meant. Each side therefore states the contrast — `maestro_todo`'s description names `todo_write`, and `TASK_SYSTEMS_NOTE` (published as the `memory:task-systems` prompt context) names both every turn.
+
 - **Five tracks**: `memory` (global), `user`, `project` (per-cwd log), `key` (per-cwd long-term), `daily` (per-day file). `project`/`key` require `cwd`.
 - **Entry grammar** lives in `legacy-format.ts` (delimiter `\n§\n`, `[id:xxxxxxxx]`, `[summary:...]`, `[branch:...]`). ID-stripped dedupe on `add`.
 - **Atomic writes only** — route mutations through `atomic-store.ts` (`withLockSync` for read-modify-write; `appendEntryAtomicSync` for appends). Never `readFileSync`+`writeFileSync` a memory file directly.
 - **Bounded snapshot** — sections are byte-capped per {@link SNAPSHOT_SECTION_CAPS} and the rendered text collapses brace runs (DSH prompt interpolation fails a turn on a malformed `{{name}}`). For human-facing sessions the end-of-turn discipline note is preserved **verbatim** and is always the last part; the write-backlog alert renders immediately *before* it and never displaces it.
 - **Subagent sessions** (`session.header.origin === 'subagent'`) get a per-achievement cadence instead of the per-turn duty and never the backlog alert. Changing the human-facing note must not change the subagent variant, and vice versa.
 - **Write watchdog is opt-in** (`config.writeGuard`, default off) and in-memory only: it guards per-turn drift inside one process, not durable state. A turn counts only when it is human-origin AND dispatched at least one tool call (`readTurnFacts`) — pure question/answer turns must never accrue debt. A write discharges the duty only when it actually recorded something (`daily`/`project`, not a duplicate).
-- **Gated writes** — the model writes via `memory_suggest` (queue → user approve) and `dtodo`; `memory add` is the explicit path. RPC endpoints are `loopback` authority.
+- **Gated writes** — the model writes via `memory_suggest` (queue → user approve) and `maestro_todo`; `memory add` is the explicit path. RPC endpoints are `loopback` authority.
 - Keep the host/client split; client bundle injects `['@deepseek-ai/dsh-client-runtime','@deepseek-ai/dsh-client-ui-slots']`.
 - Strict TDD with vitest; every deterministic operation is a tool, LLM is reasoning-only.
 

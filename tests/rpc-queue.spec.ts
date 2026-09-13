@@ -64,7 +64,7 @@ describe('M2-PR-B gated memory_suggest and explicit RPC', () => {
     const ctx = fakeCtx(root)
     apply(ctx, { memoryDir: root })
 
-    expect(ctx.state.tools.map((tool: any) => tool.name)).toEqual(['memory', 'memory_suggest', 'dtodo'])
+    expect(ctx.state.tools.map((tool: any) => tool.name)).toEqual(['memory', 'memory_suggest', 'maestro_todo'])
     for (const tool of ctx.state.tools) {
       expect(tool.output).toEqual(expect.objectContaining({
         schema: {

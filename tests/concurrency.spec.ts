@@ -10,9 +10,9 @@ describe('concurrency gating', () => {
     expect(isMemoryConcurrencySafe({ action: 'remove' })).toBe(false)
     expect(isMemoryConcurrencySafe({ action: 'archive' })).toBe(false)
   })
-  it('dtodo list safe via source check', async () => {
+  it('maestro_todo list safe via source check', async () => {
     const src = await import('node:fs').then(m => m.readFileSync(new URL('../src/host/index.ts', import.meta.url), 'utf8'))
-    expect(src).toContain("name: 'dtodo'")
+    expect(src).toContain("name: 'maestro_todo'")
     expect(src).toContain('isConcurrencySafe')
     expect(src).toContain('aborted')
   })

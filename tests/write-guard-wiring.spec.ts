@@ -18,7 +18,7 @@ function fakeCtx() {
   let snapshot: any = null
   const ctx: any = {
     tools: { register: (t: any) => { tools.push(t); return () => {} } },
-    systemPrompt: { context: (def: any) => { snapshot = def; return () => {} } },
+    systemPrompt: { context: (def: any) => { if (def?.name === 'memory:snapshot') snapshot = def; return () => {} } },
     connection: {
       rpc: {
         handle: (channel: string, handler: any) => {

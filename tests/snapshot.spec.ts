@@ -20,11 +20,11 @@ describe('renderSnapshot contract', () => {
     expect(text).toContain('my-session')
   })
 
-  it('includes end-of-turn discipline note (daily+project + dtodo)', () => {
+  it('includes end-of-turn discipline note (daily+project + maestro_todo)', () => {
     const text = renderSnapshot(store, { cwd: '/tmp/x', sessionId: 's1' })
     expect(text).toMatch(/End of every turn/i)
     expect(text).toMatch(/daily.*project/i)
-    expect(text).toMatch(/dtodo list/i)
+    expect(text).toMatch(/maestro_todo list/i)
   })
 
   it('bounded: includes USER+MEMORY+KEY, project via auto-recall (top-4), recent daily (512B) may include daily', () => {
@@ -271,7 +271,7 @@ describe('renderSnapshot subagent gating', () => {
     expect(text).toMatch(/do not write for writing's sake/i)
     // The per-turn cadence belongs to human-facing sessions only.
     expect(text).not.toMatch(/End of every turn/i)
-    expect(text).not.toMatch(/dtodo list/i)
+    expect(text).not.toMatch(/maestro_todo list/i)
   })
 
   it('leaves the human-facing discipline note untouched when not a subagent', () => {

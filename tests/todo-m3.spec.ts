@@ -105,7 +105,7 @@ describe('M3-PR-A todo four tracks + IDs', () => {
     const s = new TodoStore(root)
     const ctx = fakeCtx(root)
     apply(ctx, { memoryDir: root })
-    const dtodo = ctx.state.tools.find((t: any) => t.name === 'dtodo')
+    const dtodo = ctx.state.tools.find((t: any) => t.name === 'maestro_todo')
     expect(dtodo).toBeDefined()
     const exec = { agent: { session: { header: { cwd } } } }
     // important+urgent => q1
@@ -209,10 +209,10 @@ describe('M3-PR-A todo four tracks + IDs', () => {
     expect(pastExpired.items.some((i) => i.text === 'yesterday pending')).toBe(true)
   })
 
-  it('dtodo compatibility tool registers and handles all actions', async () => {
+  it('maestro_todo tool registers and handles all actions', async () => {
     const ctx = fakeCtx(root)
     apply(ctx, { memoryDir: root })
-    const dtodo = ctx.state.tools.find((t: any) => t.name === 'dtodo')
+    const dtodo = ctx.state.tools.find((t: any) => t.name === 'maestro_todo')
     expect(dtodo).toBeDefined()
     expect(dtodo.parameters.properties.action.enum).toEqual(['add', 'list', 'done', 'update', 'remove'])
     const exec = { agent: { session: { header: { cwd } } } }
