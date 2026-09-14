@@ -21,8 +21,10 @@ import {
   readEntries,
   appendEntryAtomic,
   writeEntriesAtomic,
+  createBackupSync,
   withLockSync,
 } from '../storage/atomic-store.ts'
+import { planRepair } from '../storage/repair.ts'
 import {
   resolveMemoryRoot,
   globalMemoryPath,
@@ -50,6 +52,11 @@ import { desensitize } from './sanitize.ts'
 
 export type MemoryTarget = 'memory' | 'global' | 'user' | 'project' | 'key' | 'daily'
 export type MemoryAction = 'add' | 'list' | 'replace' | 'remove' | 'archive' | 'expand'
+
+/** Outcome of repairing one store file (see {@link MaestroMemoryStore.repairFile}). */
+export type RepairFileResult =
+  | { ok: true; changed: boolean; before: number; after: number; split: number; deduped: number; backup: string | null }
+  | { ok: false; error: string }
 
 export interface ListOpts {
   filter?: string
@@ -673,6 +680,55 @@ export class MaestroMemoryStore {
   /** Snapshot that respects branch filter (same as above, explicit) */
   snapshotForBranch(cwd: string | null, branch?: string): string {
     return this.snapshot(cwd, { branch })
+  }
+
+  /**
+   * Repair one store file in place: split entries that were glued without the
+   * `§` delimiter, drop exact duplicates, back up first.
+   *
+   * Pure planning lives in `storage/repair.ts`; this method owns the lock, the
+   * backup and the atomic write. A clean file (or a missing one) is a no-op and
+   * produces no backup — repairing must never churn a healthy store.
+   */
+  repairFile(filePath: string): RepairFileResult {
+    try {
+      this.assertNotBlocked()
+    } catch (e: any) {
+      return { ok: false, error: e?.message ?? String(e) }
+    }
+    try {
+      if (!existsSync(filePath)) {
+        return { ok: true, changed: false, before: 0, after: 0, split: 0, deduped: 0, backup: null }
+      }
+    } catch (e: any) {
+      return { ok: false, error: e?.message ?? String(e) }
+    }
+    return withLockSync(dirname(filePath), () => {
+      const raw = readFileSync(filePath, 'utf8')
+      const plan = planRepair(raw)
+      if (!plan.changed) {
+        return {
+          ok: true as const,
+          changed: false,
+          before: plan.before,
+          after: plan.after,
+          split: plan.split,
+          deduped: plan.deduped,
+          backup: null,
+        }
+      }
+      const backup = createBackupSync(filePath)
+      writeAtomicSync(filePath, plan.text)
+      return {
+        ok: true as const,
+        changed: true,
+        before: plan.before,
+        after: plan.after,
+        split: plan.split,
+        deduped: plan.deduped,
+        backup,
+      }
+    })
   }
 
   /**

@@ -5,6 +5,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import { existsSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { MaestroMemoryStore } from './memory/store.ts'
+import { repairAllTracks } from './memory/repair-runner.ts'
 import { applyBatch } from './memory/batch.ts'
 import { buildFeedbackLine } from './memory/feedback.ts'
 import { TodoStore, resolveQuadrant, DEFAULT_VIEW_LIMIT } from './todo/store.ts'
@@ -131,6 +132,27 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
     }
     return () => {}
   }, 'maestro-memory: key-repair')
+
+  // Whole-store repair, versioned separately from the KEY-only v1 pass above.
+  // v1 never looked at the global MEMORY.md, which is exactly where the
+  // 2026-09-09 migration glued two entries together and duplicated a third —
+  // the injected `# Global Memory` section became one blob and pushed a hard
+  // rule out of every prompt. A new flag file (not a rename of the old one)
+  // keeps a downgrade from re-running v1.
+  ctx.effect(() => {
+    const flagFile = join(maestroMetaDir(root), 'delimiter-repaired-v2')
+    if (!existsSync(flagFile)) {
+      let report: unknown = null
+      try {
+        report = repairAllTracks(root, { dryRun: false })
+      } catch {}
+      try {
+        mkdirSync(maestroMetaDir(root), { recursive: true })
+        writeFileSync(flagFile, JSON.stringify({ at: new Date().toISOString(), report }), 'utf8')
+      } catch {}
+    }
+    return () => {}
+  }, 'maestro-memory: delimiter-repair')
 
   // Auto-memory (opt-in, default disabled) — session/event → store
   ctx.effect(() => {
@@ -640,6 +662,16 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
         }
         case 'status': {
           return { ok: true, queue: queue.read().length, blocked: migration.isWriteBlocked(root) }
+        }
+        case 'memory.repair': {
+          // Preview-first: cleaning a store file is a write, so `dryRun` is the
+          // default and an actual repair needs an explicit confirm.
+          const dryRun = payload?.dryRun !== false
+          if (!dryRun && payload?.confirm !== true) {
+            return { ok: false, error: 'confirm:true required to write repairs' }
+          }
+          const report = repairAllTracks(root, { dryRun })
+          return { ok: true, dryRun, report }
         }
         case 'migration.inspect': {
           const insp = await migration.inspect(root)
