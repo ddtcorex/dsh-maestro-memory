@@ -26,6 +26,9 @@ const HEAD_LINE_RE = /^(?:\[id:\s*[0-9a-f]{8}\]\s*)?\[\d{4}-\d{2}-\d{2}(?:[ T][\
 const SUMMARY_TAG_RE = /\[summary:[^\]]*\]\s*/g
 const ID_TAG_RE = /^\[id:\s*[0-9a-f]{8}\]\s*/i
 
+/** A `§` with optional surrounding newlines — the lenient form the old KEY-only repair used. */
+const LENIENT_DELIM_RE = /\n?§\n?/
+
 export interface RepairPlan {
   /** Entries parsed from the raw text before repair. */
   before: number
@@ -43,6 +46,27 @@ export interface RepairPlan {
   entries: string[]
   /** Canonical serialization of `entries`. */
   text: string
+}
+
+/**
+ * Split an entry on a `§` that is NOT the canonical `\n§\n` separator.
+ *
+ * `parseEntries` splits on the canonical form only, so a delimiter glued to
+ * content (`body§ [2026-09-01] next`) leaves two logical entries inside one.
+ * The split is accepted only when EVERY resulting piece starts with an entry
+ * head — prose that merely contains a `§` stays a single entry.
+ *
+ * This replaces the old `repairKeyDelimiter()` boot pass, which had been a
+ * silent no-op since it was written: it was called with a bogus cwd, so it
+ * resolved `projects/<sha1('')>/KEY.md`, found nothing, and returned
+ * `{repaired: 0}`. It also only ever looked at KEY.md.
+ */
+function splitStrayDelimiter(entry: string): string[] {
+  if (!entry.includes('§')) return [entry]
+  const pieces = entry.split(LENIENT_DELIM_RE).map((p) => p.trim()).filter((p) => p.length > 0)
+  if (pieces.length <= 1) return [entry]
+  if (!pieces.every((p) => HEAD_LINE_RE.test(p))) return [entry]
+  return pieces
 }
 
 /** Split one parsed entry into the logical entries glued inside it. */
@@ -106,7 +130,7 @@ function dedupe(entries: string[]): { entries: string[]; removed: number } {
 export function planRepair(raw: string): RepairPlan {
   const source = String(raw ?? '')
   const parsed = parseEntries(source)
-  const splitEntries = parsed.flatMap(splitGlued)
+  const splitEntries = parsed.flatMap(splitStrayDelimiter).flatMap(splitGlued)
   const relocatedEntries = splitEntries.map(relocateTrailingSummary)
   const relocated = relocatedEntries.reduce((n, e, i) => (e === splitEntries[i] ? n : n + 1), 0)
   const { entries, removed } = dedupe(relocatedEntries)

@@ -113,39 +113,22 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
   // restart starts a fresh window on purpose (same reasoning as the gap counter).
   const costTracker = createCostTracker()
 
-  // One-time KEY.md delimiter repair (guarded by flag file)
+  // One-time whole-store repair, versioned by flag file.
+  //
+  // v1 was a KEY.md-only pass that had been a silent no-op since it was written:
+  // it called repairKeyDelimiter() with a bogus cwd, so it resolved
+  // `projects/<sha1('')>/KEY.md`, found nothing and returned `{repaired: 0}`.
+  // It is deleted; planRepair() now covers the class it was meant to handle
+  // (a `§` glued to content) for every track, not just KEY.md.
+  //
+  // v2 repaired the store the 2026-09-09 migration corrupted — 480 duplicate
+  // entries across 38 files, and the global MEMORY.md glued into one blob that
+  // pushed a hard rule out of every prompt.
+  //
+  // v3 adds the stray-delimiter split, so machines that already ran v2 pick it
+  // up once without re-running the earlier passes.
   ctx.effect(() => {
-    const flagFile = join(maestroMetaDir(root), 'key-repaired-v1')
-    if (!existsSync(flagFile)) {
-      // Attempt repair for any project that has a KEY.md
-      try {
-        const projectsDir = join(root, 'projects')
-        if (existsSync(projectsDir)) {
-          for (const projectHash of readdirSync(projectsDir)) {
-            const keyFile = join(projectsDir, projectHash, 'KEY.md')
-            if (existsSync(keyFile)) {
-              store.repairKeyDelimiter(keyFile.replace(join(root, 'projects', projectHash, 'KEY.md'), ''))
-            }
-          }
-        }
-      } catch {}
-      // Write flag to prevent re-running
-      try {
-        mkdirSync(maestroMetaDir(root), { recursive: true })
-        writeFileSync(flagFile, 'ok', 'utf8')
-      } catch {}
-    }
-    return () => {}
-  }, 'maestro-memory: key-repair')
-
-  // Whole-store repair, versioned separately from the KEY-only v1 pass above.
-  // v1 never looked at the global MEMORY.md, which is exactly where the
-  // 2026-09-09 migration glued two entries together and duplicated a third —
-  // the injected `# Global Memory` section became one blob and pushed a hard
-  // rule out of every prompt. A new flag file (not a rename of the old one)
-  // keeps a downgrade from re-running v1.
-  ctx.effect(() => {
-    const flagFile = join(maestroMetaDir(root), 'delimiter-repaired-v2')
+    const flagFile = join(maestroMetaDir(root), 'delimiter-repaired-v3')
     if (!existsSync(flagFile)) {
       let report: unknown = null
       try {

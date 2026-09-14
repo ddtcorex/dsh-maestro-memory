@@ -74,7 +74,10 @@ describe('memory effectiveness: KEY repair', () => {
     // Repair
     const res = store.repairKeyDelimiter(cwd)
     expect(res.ok).toBe(true)
-    expect(res.repaired).toBe(3)
+    // `repaired` counts entries RECOVERED by splitting (3 pieces out of 1 parsed
+    // entry), not the file's total entry count: the old value made a no-op on an
+    // already-clean 2-entry file report `repaired: 2`.
+    expect(res.repaired).toBe(2)
 
     // After repair: file is canonical (ends with newline, delimiter between entries)
     const afterContent = readFileSync(keyFile, 'utf8')
@@ -100,11 +103,12 @@ describe('memory effectiveness: KEY repair', () => {
     expect(res.ok).toBe(true)
     expect(res.repaired).toBe(0)
 
-    // Already canonical - re-serializes (no-op) but returns entry count
+    // Already canonical — a repair is a no-op and reports nothing recovered.
     writeFileSync(keyFile, 'entry1\n§\nentry2\n', 'utf8')
     res = store.repairKeyDelimiter(cwd)
     expect(res.ok).toBe(true)
-    expect(res.repaired).toBe(2) // re-serializes 2 entries
+    expect(res.repaired).toBe(0)
+    expect(readFileSync(keyFile, 'utf8')).toBe('entry1\n§\nentry2\n')
   })
 })
 

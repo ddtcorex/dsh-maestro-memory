@@ -79,6 +79,25 @@ describe('planRepair — trailing summary relocation (F10)', () => {
   })
 })
 
+describe('planRepair — stray § delimiter (F12)', () => {
+  it('splits on a § glued to content instead of the canonical \\n§\\n', () => {
+    const plan = planRepair('[2026-08-24] alpha body§ [2026-09-01] beta body\n')
+    expect(plan.before).toBe(1)
+    expect(plan.after).toBe(2)
+    expect(plan.entries).toEqual(['[2026-08-24] alpha body', '[2026-09-01] beta body'])
+  })
+
+  it('keeps prose that merely contains a § as one entry', () => {
+    const plan = planRepair('[2026-08-24] the § section marker matters\n')
+    expect(plan.after).toBe(1)
+    expect(plan.changed).toBe(false)
+  })
+
+  it('repaired text never carries a § glued to content', () => {
+    expect(planRepair('[2026-08-24] alpha body§ [2026-09-01] beta body\n').text).not.toMatch(/[^\n]§/)
+  })
+})
+
 describe('planRepair — no-ops', () => {
   it('leaves empty and whitespace-only files alone', () => {
     for (const raw of ['', '   \n\n']) {

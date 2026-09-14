@@ -761,37 +761,24 @@ export class MaestroMemoryStore {
 
   /**
    * Repair malformed KEY.md delimiter.
-   * Reads raw file, splits on flexible delimiter (§\n or \n§\n), re-serializes canonical (\n§\n).
-   * Runs atomically (bypasses drift guard for repair). Returns { ok: true, repaired: count }.
+   * Kept as a thin alias over {@link repairFile} so there is exactly ONE repair
+   * implementation: this method used to carry its own lenient `§` split, which
+   * is the same logic `planRepair` needs for every track. (Its only caller —
+   * the v1 boot pass — was deleted on 2026-09-14: it passed a bogus cwd, so it
+   * was a silent no-op.)
+   *
+   * Returns the number of entries recovered by splitting.
    */
   repairKeyDelimiter(cwd: string): { ok: true; repaired: number } | { ok: false; error: string } {
+    let file: string
     try {
-      this.assertNotBlocked()
+      file = this.fileFor('key', cwd)
     } catch (e: any) {
       return { ok: false, error: e?.message ?? String(e) }
     }
-    const file = this.fileFor('key', cwd)
-    return withLockSync(dirname(file), () => {
-      let raw = ''
-      try {
-        raw = readFileSync(file, 'utf8')
-      } catch (error: unknown) {
-        const code = (error as NodeJS.ErrnoException).code
-        if (code !== 'ENOENT') throw error
-        raw = ''
-      }
-      if (!raw.trim()) return { ok: true, repaired: 0 }
-      // Lenient split: handle both §\n and \n§\n
-      const entries = raw
-        .split(/\n?§\n?/)
-        .map(e => e.trim())
-        .filter(e => e.length > 0)
-      if (entries.length <= 1) return { ok: true, repaired: 0 } // already canonical or empty/single
-      // Re-serialize canonical (bypass drift guard for repair)
-      const canonical = serializeEntries(entries)
-      writeAtomicSync(file, canonical)
-      return { ok: true, repaired: entries.length }
-    })
+    const res = this.repairFile(file)
+    if (!res.ok) return { ok: false, error: res.error }
+    return { ok: true, repaired: res.split }
   }
 
   /**
