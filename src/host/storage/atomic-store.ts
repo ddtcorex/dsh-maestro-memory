@@ -90,6 +90,9 @@ export function isCanonical(text: string): boolean {
 /** Regex for cross-device entry ID prefix (space after colon allowed, case-insensitive). */
 const ENTRY_ID_RE = /^\[id:\s*[0-9a-f]{8}\]\s*/i
 
+/** Summary tag appended by the auto-summary pass. */
+const ENTRY_SUMMARY_RE = /\[summary:[^\]]*\]\s*/g
+
 /**
  * Strip the `[id:xxxxxxxx]` prefix from an entry, if present.
  * @param entry - full entry text
@@ -100,16 +103,36 @@ export function stripEntryId(entry: string): string {
 }
 
 /**
- * Check whether `candidate` already exists in `entries`, comparing after
- * stripping IDs so a re-add with a new random ID is still detected as a
- * duplicate (IDs are random per write, direct includes would never hit).
+ * Body identity: id- and summary-insensitive, whitespace-normalized.
+ *
+ * This is the single notion of equality the store compares entries with — the
+ * caller (`add`), the file guard (`appendEntryAtomic*`) and the sync merge all
+ * route through it. They used to disagree: `add()` stripped the summary tag
+ * while `isDuplicate()` and `merge.ts`'s `contentHash()` did not, so a copy
+ * carrying `[summary:…]` looked like a new entry and the store accumulated 480
+ * redundant entries across 38 files before anyone noticed.
+ *
+ * @param entry - full entry text
+ * @returns comparable body key
+ */
+export function entryBodyKey(entry: string): string {
+  return stripEntryId(String(entry ?? ''))
+    .replace(ENTRY_SUMMARY_RE, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/**
+ * Check whether `candidate` already exists in `entries`, comparing their
+ * {@link entryBodyKey}s so a re-add with a new random ID — or with a differing
+ * summary tag — is still detected as a duplicate.
  * @param entries - existing entries
  * @param candidate - new entry text
  * @returns true when a duplicate exists
  */
 export function isDuplicate(entries: string[], candidate: string): boolean {
-  const needle = stripEntryId(candidate)
-  return entries.some((e) => stripEntryId(e) === needle)
+  const needle = entryBodyKey(candidate)
+  return entries.some((e) => entryBodyKey(e) === needle)
 }
 
 /**

@@ -429,13 +429,12 @@ export class MaestroMemoryStore {
     } catch (e: any) {
       return { ok: false, error: e?.message ?? String(e) }
     }
-    // Dedupe with stripped id+summary so summary difference doesn't create duplicate
+    // Dedupe with the shared body key (id- and summary-insensitive) so a
+    // differing summary can never create a duplicate. `isDuplicate` is the same
+    // predicate the file guard and the sync merge use.
     try {
       const existing = readEntriesSync(file)
-      const stripForDedupe = (s: string) => s.replace(/\[summary:[^\]]*\]\s*/g, '').replace(/^\[id:\s*[0-9a-f]{8}\]\s*/i, '').trim()
-      const probe = stripForDedupe(content)
-      const isDup = existing.some((e) => stripForDedupe(e) === probe)
-      if (isDup) return { ok: true, duplicate: true }
+      if (isDuplicate(existing, content)) return { ok: true, duplicate: true }
     } catch {
       // read failure → treat as no duplicate, let append handle it
     }
