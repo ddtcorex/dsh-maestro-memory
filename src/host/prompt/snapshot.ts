@@ -42,13 +42,26 @@ function compactToHead(entry: string): string {
   return `${entryHeadPrefix(entry)}[summary:${summary}]`
 }
 
+/** What a capped section actually cost, including what the cap excluded. */
+export interface FittedSection {
+  kept: string[]
+  /** UTF-8 bytes of the kept entries, separators included. */
+  bytes: number
+  /** Entries the cap excluded. */
+  dropped: number
+}
+
 /**
  * Keep the newest entries whose combined UTF-8 size (with separators) fits `cap`.
  * The newest entry is always kept — compacted to its summary head when oversized
  * and tagged; untagged oversize entries stay whole rather than vanishing.
+ *
+ * Returns the drop count as well as the kept entries: without it, a store that
+ * has outgrown its window and a cap that is too eager look identical from the
+ * outside — which is how a hard rule silently stopped being injected.
  */
-function fitSection(entries: string[], cap: number): string[] {
-  if (entries.length === 0) return []
+function fitSection(entries: string[], cap: number): FittedSection {
+  if (entries.length === 0) return { kept: [], bytes: 0, dropped: 0 }
   const keptDesc: string[] = []
   let used = 0
   for (let i = entries.length - 1; i >= 0; i--) {
@@ -60,7 +73,7 @@ function fitSection(entries: string[], cap: number): string[] {
     keptDesc.push(candidate)
     used += cost
   }
-  return keptDesc.reverse()
+  return { kept: keptDesc.reverse(), bytes: used, dropped: entries.length - keptDesc.length }
 }
 
 /**
@@ -76,20 +89,44 @@ function neutralizePromptBraces(text: string): string {
   return text.replace(/\{{2,}/g, '{').replace(/\}{2,}/g, '}')
 }
 
+/** Per-section cost of one render. */
+export interface SectionStats {
+  key: 'memory' | 'user' | 'key' | 'projectContext' | 'reference' | 'recentDaily'
+  cap: number
+  bytes: number
+  entries: number
+  dropped: number
+}
+
+/** Cost of one rendered snapshot. */
+export interface SnapshotStats {
+  totalBytes: number
+  sections: SectionStats[]
+  renderedAt: number
+}
+
 /**
  * Bounded snapshot renderer — contract from README § System Prompt Snapshot:
  * Header (sessionId/sessionName) + USER + global MEMORY + current-project KEY
  * (branch-filtered) + Project Context (auto-recall top-4, 600 chars each)
  * + Recent Daily + end-of-turn discipline note.
  * Full daily/project logs are query-only; only the bounded recall slices are injected.
+ *
+ * Every capped section records what it kept and what its cap excluded, so the
+ * cost of memory on the prompt is measurable instead of inferred.
  */
-export function renderSnapshot(
+export function renderSnapshotWithStats(
   store: MaestroMemoryStore,
   ctx: SnapshotContext,
   opts: SnapshotRenderOpts = {},
-): string {
+): { text: string; stats: SnapshotStats } {
   const caps = { ...SNAPSHOT_SECTION_CAPS, ...opts.caps }
   const parts: string[] = []
+  const sections: SectionStats[] = []
+  const take = (key: SectionStats['key'], fitted: FittedSection, cap: number, text: string) => {
+    parts.push(text)
+    sections.push({ key, cap, bytes: fitted.bytes, entries: fitted.kept.length, dropped: fitted.dropped })
+  }
 
   // Header
   if (ctx.sessionId || ctx.sessionName) {
@@ -104,7 +141,7 @@ export function renderSnapshot(
   const mem = fitSection(store.list('memory'), caps.memory)
   let user = fitSection(store.list('user'), caps.user)
   // Bootstrap USER.md from session context when missing/empty (no profile file yet)
-  if (user.length === 0 && (ctx.sessionName || ctx.sessionId)) {
+  if (user.kept.length === 0 && (ctx.sessionName || ctx.sessionId)) {
     try {
       const userFile = userMemoryPath(store.resolveRoot())
       if (!existsSync(userFile) || readFileSync(userFile, 'utf8').trim() === '') {
@@ -122,11 +159,11 @@ export function renderSnapshot(
   }
   const key = ctx.cwd
     ? fitSection(store.list('key', ctx.cwd, ctx.branch ? { branch: ctx.branch } : {}), caps.key)
-    : []
+    : { kept: [], bytes: 0, dropped: 0 }
 
-  if (mem.length) parts.push(`# Global Memory\n${mem.join('\n---\n')}`)
-  if (user.length) parts.push(`# User Memory\n${user.join('\n---\n')}`)
-  if (key.length) parts.push(`# Project Key Memory\n${key.join('\n---\n')}`)
+  if (mem.kept.length) take('memory', mem, caps.memory, `# Global Memory\n${mem.kept.join('\n---\n')}`)
+  if (user.kept.length) take('user', user, caps.user, `# User Memory\n${user.kept.join('\n---\n')}`)
+  if (key.kept.length) take('key', key, caps.key, `# Project Key Memory\n${key.kept.join('\n---\n')}`)
 
   // Auto-recall: newest 4 project entries for current cwd, each truncated to 600 chars
   // Mirrors dsh-memory timeline(limit:4, 600 chars) but file-native, no Python.
@@ -136,7 +173,7 @@ export function renderSnapshot(
       if (proj.length) {
         const newest4 = proj.slice(-4).map((e) => e.slice(0, 600))
         const fitted = fitSection(newest4, (caps as any).autoRecall ?? 1024)
-        if (fitted.length) parts.push(`# Project Context\n${fitted.join('\n---\n')}`)
+        if (fitted.kept.length) take('projectContext', fitted, (caps as any).autoRecall ?? 1024, `# Project Context\n${fitted.kept.join('\n---\n')}`)
       }
     } catch {}
 
@@ -147,7 +184,10 @@ export function renderSnapshot(
       if (existsSync(refPath)) {
         const refContent = readFileSync(refPath, 'utf8')
         const slice = refContent.slice(0, 2048)
-        if (slice.trim().length > 0) parts.push(`# Project Knowledge\n${slice}`)
+        if (slice.trim().length > 0) {
+          const bytes = Buffer.byteLength(slice, 'utf8')
+          take('reference', { kept: [slice], bytes, dropped: 0 }, 2048, `# Project Knowledge\n${slice}`)
+        }
       }
     } catch {}
   }
@@ -172,7 +212,7 @@ export function renderSnapshot(
     }
     if (recentDaily.length) {
       const fitted = fitSection(recentDaily, caps.recentDaily)
-      if (fitted.length) parts.push(`# Recent Daily\n${fitted.join('\n---\n')}`)
+      if (fitted.kept.length) take('recentDaily', fitted, caps.recentDaily, `# Recent Daily\n${fitted.kept.join('\n---\n')}`)
     }
   } catch {}
 
@@ -197,7 +237,29 @@ export function renderSnapshot(
   if (opts.writeGuard && !ctx.isSubagent) deduped.push(renderWriteBacklog(opts.writeGuard.threshold))
   deduped.push(discipline)
 
-  return neutralizePromptBraces(deduped.join('\n\n'))
+  const text = neutralizePromptBraces(deduped.join('\n\n'))
+  return {
+    text,
+    stats: {
+      totalBytes: Buffer.byteLength(text, 'utf8'),
+      // The discipline/backlog tail is prompt contract, not store content: it is
+      // counted in `totalBytes` and deliberately has no section row of its own.
+      sections,
+      renderedAt: Date.now(),
+    },
+  }
+}
+
+/**
+ * Signature-compatible wrapper. Callers that need the cost use
+ * {@link renderSnapshotWithStats}; everything else keeps calling this.
+ */
+export function renderSnapshot(
+  store: MaestroMemoryStore,
+  ctx: SnapshotContext,
+  opts: SnapshotRenderOpts = {},
+): string {
+  return renderSnapshotWithStats(store, ctx, opts).text
 }
 
 /**

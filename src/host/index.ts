@@ -17,7 +17,8 @@ import * as migration from './migration/service.ts'
 import { SyncService } from './sync/service.ts'
 import { RealGitAdapter } from './sync/git.ts'
 import { listSkillsSync, resolveDefaultMaestroSkillsDir } from './skills-browser.ts'
-import { renderSnapshot } from './prompt/snapshot.ts'
+import { renderSnapshotWithStats } from './prompt/snapshot.ts'
+import { createCostTracker } from './cost-tracker.ts'
 import { installAutoMemoryHooks, DEFAULT_AUTO_MEMORY, type AutoMemoryOptions } from './auto-memory.ts'
 import { computeFiveDim } from './health-score.ts'
 import { createWriteGapCounter, isGuardedTrack } from './memory/write-guard.ts'
@@ -107,6 +108,9 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
   // Per-turn write watchdog (opt-in). The counter lives for the process; it is
   // a pacing aid for drift inside one run, not durable state.
   const writeGuard = createWriteGapCounter(ctx, () => writeGuardConfig.enabled)
+  // What the snapshot is costing the prompt, per section. In-memory only: a
+  // restart starts a fresh window on purpose (same reasoning as the gap counter).
+  const costTracker = createCostTracker()
 
   // One-time KEY.md delimiter repair (guarded by flag file)
   ctx.effect(() => {
@@ -183,11 +187,16 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
         const due = writeGuardConfig.enabled
           && !isSubagent
           && writeGuard.gapOf(agent) >= writeGuardConfig.threshold
-        return renderSnapshot(
+        const { text, stats } = renderSnapshotWithStats(
           store,
           { cwd, branch, sessionId, sessionName, isSubagent },
           due ? { writeGuard: { threshold: writeGuardConfig.threshold } } : {},
         )
+        // Pacing/stats must never fail a turn.
+        try {
+          costTracker.record(stats)
+        } catch {}
+        return text
       },
     })
     return () => {
@@ -795,10 +804,13 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
     const healthChannel = '/dsh-maestro-memory-health'
     const healthHandler = async (endpoint: string, payload: any) => {
       try {
+        // Cost is a property of the renderer, not of any one project, so it is
+        // reported on both paths — including when cwd is missing.
+        const cost = costTracker.snapshot()
         const cwdRaw = (payload && typeof payload.cwd === 'string' && payload.cwd.trim()) ? payload.cwd.trim() : ''
         // Health requires explicit cwd; if missing, return empty (client should pass sessionCwd)
         if (!cwdRaw) {
-          return { ok: true, value: { project: { total: 0, withSummary: 0, coverage: 100 }, daily: { counts: [0,0,0,0,0,0,0] }, longest: [] } }
+          return { ok: true, value: { project: { total: 0, withSummary: 0, coverage: 100 }, daily: { counts: [0,0,0,0,0,0,0] }, longest: [], cost } }
         }
         const cwd = cwdRaw
         const projectEntries = store.list('project', cwd)
@@ -826,7 +838,7 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
           hasSanitize: true,
           hasGatedQueue: true,
         })
-        const health = { project: { total, withSummary, coverage }, daily: { counts: dailyCounts }, longest, fiveDim }
+        const health = { project: { total, withSummary, coverage }, daily: { counts: dailyCounts }, longest, fiveDim, cost }
         return { ok: true, value: health }
       } catch (e: any) {
         return { ok: false, error: e?.message ?? String(e) }
