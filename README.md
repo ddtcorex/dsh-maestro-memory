@@ -126,8 +126,9 @@ defaults to `true` and an actual write needs `confirm: true`):
 | `memory.maintenance` | Plans (and optionally applies) the archive of the oldest entries of `memory`/`user`/`key`/`project` beyond `DEFAULT_ARCHIVE_POLICY` (keep-bytes + max-age). Overgrown entries move to the track's `*-archive.md`; they are never dropped. |
 
 Two repair passes also run once at boot, each gated by its own flag file under
-`<root>/.maestro/`: `key-repaired-v1` (KEY.md delimiters) and
-`delimiter-repaired-v2` (every store file, with the report written to the flag).
+`<root>/.maestro-memory/` (`maestroMetaDir`): `key-repaired-v1` (KEY.md
+delimiters) and `delimiter-repaired-v2` (every store file, with the run report
+written into the flag).
 
 ## Maintenance
 
