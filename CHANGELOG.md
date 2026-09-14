@@ -55,6 +55,14 @@ All notable changes to this project are documented in this file. Format follows
   substring of the stored entry, which stops matching once the summary tag moves to the header; the
   batch now removes by the final stored text `add()` reports.
 
+### Notes
+- **Archiving and the two-machine sync interact.** `sync/` merges `MEMORY.md` / `KEY.md` /
+  `KEY-archive.md` as a union, and id-less entries cannot express a deletion, so archiving on one
+  machine only is undone by the next merge. Archive on every machine with the same policy, or with
+  sync disabled. `MEMORY-archive.md` is not in the merge set, so a project-track archive stays local.
+  Measured on the live store: `projects/<hash>/MEMORY.md` 402 KB / 869 entries → 132 KB / 242 entries
+  after repair + archive, with the rendered prompt **byte-identical** before and after the archive.
+
 ### Removed
 - **`pruneGlobalMemory()`** — unused, and it fitted the live global file to the snapshot cap by
   **dropping** the overflow. It also carried a second `fitSection` that disagreed with the
