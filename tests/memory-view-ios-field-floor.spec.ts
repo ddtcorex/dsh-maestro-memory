@@ -4,11 +4,12 @@ import { fileURLToPath } from 'node:url'
 
 // iOS WebKit zooms the whole visual viewport when a focused <input>/<textarea>
 // computes a font-size below 16px, so dsh-maestro-mobile holds every text field
-// on the page at a 16px floor under `html[data-mobile-nav-ios]`, inside
-// `(max-width: 1023px) and (pointer: coarse)`. Left alone, that floor makes the
-// panel's placeholders and typed text 3px larger than every card and label
-// around them. The panel is a dense tool surface designed at 13px, so it opts
-// its own fields out of the floor and keeps the size it was designed with.
+// on the page at a 16px floor under `html[data-mobile-nav-ios]`. An earlier
+// revision of this panel opted its own fields back out to 13px for a dense
+// 13px scale — and every tap on those fields zoomed the page on iPhone (user
+// report). Function beats pixels: the panel holds its fields at the same 16px
+// on iOS. Android and desktop never carry the marker, so the 13px scale they
+// were designed with is untouched.
 const client = readFileSync(
   fileURLToPath(new URL('../src/client/index.tsx', import.meta.url)),
   'utf8',
@@ -32,7 +33,7 @@ function floorBlock(): string {
   return rules.slice(open + 1, close)
 }
 
-describe('memory view keeps its own 13px scale on iOS', () => {
+describe('memory view holds the iOS 16px field floor', () => {
   it('keeps the 13px body size wherever no field floor applies', () => {
     const rootRule = rules.match(/\n\.memx \{[^}]*\}/)?.[0] ?? ''
     expect(rootRule).toMatch(/font-size:\s*13px/)
@@ -45,19 +46,20 @@ describe('memory view keeps its own 13px scale on iOS', () => {
     expect(guardAt).toBeGreaterThan(rules.indexOf(FLOOR_QUERY))
   })
 
-  it('pins the panel fields back to the 13px the panel is designed at', () => {
+  it('holds the panel fields at 16px on iOS (opting out re-enables focus zoom)', () => {
     const block = floorBlock()
     expect(block).toContain('html[data-mobile-nav-ios] .memx input')
     expect(block).toContain('.memx textarea')
     expect(block).toContain('.memx select')
-    // the floor is published with !important, so the opt-out must be too
-    expect(block).toMatch(/font-size:\s*13px\s*!important/)
+    // the floor is published with !important, so the hold must be too
+    expect(block).toMatch(/font-size:\s*16px\s*!important/)
+    expect(block).not.toMatch(/font-size:\s*(13px|inherit)\s*!important/)
   })
 
   it('out-ranks the floor selector, which carries ten :not([type=…]) clauses', () => {
     const block = floorBlock()
-    // id-level specificity is what beats that chain; without it the floor wins
-    // and the fields silently grow back to 16px
+    // id-level specificity keeps this declaration winning over the floor; without it
+    // a later equal-specificity rule could silently shrink the fields back below 16px
     expect(block).toMatch(/:not\(#[A-Za-z][\w-]*\)/)
   })
 })
