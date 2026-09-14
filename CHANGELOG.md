@@ -4,6 +4,57 @@ All notable changes to this project are documented in this file. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Versioned whole-store repair** (`storage/repair.ts`, `memory/repair-runner.ts`, endpoint
+  `memory.repair`) — a pure planner splits entries glued without the `§` delimiter, drops exact
+  duplicates and moves a trailing `[summary:…]` to its canonical header position. A boot pass
+  (`delimiter-repaired-v2`) applies it to every store file; the v1 pass covered `KEY.md` only, which
+  is why the global `MEMORY.md` kept a glued duplicate that consumed the whole `# Global Memory`
+  section and pushed a hard rule out of every prompt. Measured on the live store: **480 redundant
+  entries across 38 files**, and 111 of 150 `KEY.md` entries carrying an unreadable summary tag.
+- **`memory.maintenance`** — a preview-first archive planner (`memory/maintenance.ts`). Oldest
+  entries beyond a track's keep-bytes or max-age move to the track's `*-archive.md`; `dryRun`
+  defaults to true and `confirm: true` is required to write. Live preview: `key` 149 → 38 live
+  entries (106 KB archived), `project` 870 → 209 (267 KB).
+- **Snapshot cost statistics** (`cost-tracker.ts`) — per-section bytes, entry counts, excluded-entry
+  counts and truncations, reported as `cost` on `/dsh-maestro-memory-health`. Baseline before this
+  existed: 25.9 MB of memory text injected across 1,300 sessions, median 12.6 KB per render, largest
+  single session 1.76 MB.
+
+### Changed
+- **Section caps are hard in both dimensions** — each section now has an entry budget
+  (`SNAPSHOT_SECTION_MAX_ENTRIES`), and an untagged entry larger than twice its byte cap is
+  truncated with an explicit marker instead of silently owning the section.
+- **`daily` entries carry `[summary:…]`** — the exemption made the smallest section (512 B) the only
+  one that could not compact.
+- **One entry-body predicate** (`entryBodyKey`) shared by `add()`, the file guard and the sync
+  merge. `isDuplicate()` now strips `[summary:…]` as well as `[id:…]` — the file-level guard was
+  strictly weaker than its caller.
+- `add()` reports the final stored text as `entry`, so a caller that must undo a write has a token
+  that actually matches what was written.
+
+### Fixed
+- **Auto-summaries were unreadable to the compactor.** `ensureAutoSummary` appended `[summary:…]` at
+  the END of an entry, but the grammar — and `parseEntrySummary`, `stripEntrySummary`,
+  `compactToHead` — only reads the tag at the header position. Every auto-summarized entry was
+  therefore un-compactable: the 512 B `# Recent Daily` section rendered 1,518 B and the global
+  section 2,303 B against a 2,048 B cap. New writes insert the tag after the header; repair
+  relocates existing ones.
+- **The sync merge re-created duplicates on every sync.** `merge.ts`'s `contentHash()` stripped only
+  `[id:…]`, so an entry and its summary-tagged twin hashed differently and the union merge kept both
+  (480 redundant entries across 38 files after the 2026-09-14 two-machine sync). It now uses the
+  shared body predicate.
+- **`applyBatch` rollback missed entries.** It removed by matching the caller's raw content as a
+  substring of the stored entry, which stops matching once the summary tag moves to the header; the
+  batch now removes by the final stored text `add()` reports.
+
+### Removed
+- **`pruneGlobalMemory()`** — unused, and it fitted the live global file to the snapshot cap by
+  **dropping** the overflow. It also carried a second `fitSection` that disagreed with the
+  renderer's. Archiving (`memory.maintenance`) keeps those entries queryable instead.
+
 ## [2.0.0] - 2026-09-14
 
 ### Changed
