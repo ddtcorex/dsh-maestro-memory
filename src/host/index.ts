@@ -6,6 +6,7 @@ import { existsSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { MaestroMemoryStore } from './memory/store.ts'
 import { repairAllTracks } from './memory/repair-runner.ts'
+import { planArchive, DEFAULT_ARCHIVE_POLICY } from './memory/maintenance.ts'
 import { applyBatch } from './memory/batch.ts'
 import { buildFeedbackLine } from './memory/feedback.ts'
 import { TodoStore, resolveQuadrant, DEFAULT_VIEW_LIMIT } from './todo/store.ts'
@@ -681,6 +682,30 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
           }
           const report = repairAllTracks(root, { dryRun })
           return { ok: true, dryRun, report }
+        }
+        case 'memory.maintenance': {
+          // Preview-first: growth is bounded by MOVING the oldest entries to the
+          // track's archive file, never by dropping them, and the first real run
+          // must be a human decision made against these numbers.
+          const dryRun = payload?.dryRun !== false
+          const cwdArg = typeof payload?.cwd === 'string' && payload.cwd.trim() ? payload.cwd.trim() : undefined
+          const plan: Record<string, { keep: number; archive: number; archiveBytes: number }> = {}
+          for (const track of ['memory', 'user', 'key', 'project'] as const) {
+            if ((track === 'key' || track === 'project') && !cwdArg) continue
+            const entries = store.list(track as any, cwdArg as any)
+            const p = planArchive(entries, DEFAULT_ARCHIVE_POLICY[track])
+            plan[track] = {
+              keep: p.keep.length,
+              archive: p.archive.length,
+              archiveBytes: p.archive.reduce((n, e) => n + Buffer.byteLength(e, 'utf8'), 0),
+            }
+            if (!dryRun && p.archive.length > 0) {
+              if (payload?.confirm !== true) return { ok: false, error: 'confirm:true required to write' }
+              const res = store.applyArchive(track as any, cwdArg, p.archive)
+              if (!res.ok) return { ok: false, error: res.error }
+            }
+          }
+          return { ok: true, dryRun, plan }
         }
         case 'migration.inspect': {
           const insp = await migration.inspect(root)

@@ -58,6 +58,11 @@ export type RepairFileResult =
   | { ok: true; changed: boolean; before: number; after: number; split: number; deduped: number; relocated: number; backup: string | null }
   | { ok: false; error: string }
 
+/** Outcome of moving entries out of a live track (see {@link MaestroMemoryStore.applyArchive}). */
+export type ApplyArchiveResult =
+  | { ok: true; archived: number; backup: string | null }
+  | { ok: false; error: string }
+
 export interface ListOpts {
   filter?: string
   since?: string
@@ -790,40 +795,42 @@ export class MaestroMemoryStore {
   }
 
   /**
-   * Prune global memory (MEMORY.md) to fit the snapshot byte cap.
-   * Keeps the newest entries that fit 2048 bytes; older overflow is dropped.
+   * Move `archive` out of the live track file into its `*-archive.md`.
+   *
+   * Append-to-archive happens first: if that write fails, the live file is
+   * untouched and nothing is lost. The live file is then rewritten (backup
+   * first, lock held) with the entries that remain.
+   *
+   * This replaces the removed `pruneGlobalMemory()`, which fitted the live file
+   * to the snapshot cap by DROPPING the overflow — a data-destroying operation
+   * with no caller. Archiving keeps the entries queryable instead.
    */
-  pruneGlobalMemory(): { ok: true; removed: number } | { ok: false; error: string } {
+  applyArchive(target: MemoryTarget, cwd: string | undefined, archive: string[]): ApplyArchiveResult {
     try {
       this.assertNotBlocked()
     } catch (e: any) {
       return { ok: false, error: e?.message ?? String(e) }
     }
-    const file = this.fileFor('memory')
+    const moving = archive.filter((e) => String(e ?? '').trim().length > 0)
+    if (moving.length === 0) return { ok: false, error: 'nothing to archive' }
+    let file: string
+    try {
+      file = this.fileFor(target, cwd)
+    } catch (e: any) {
+      return { ok: false, error: e?.message ?? String(e) }
+    }
     return withLockSync(dirname(file), () => {
-      const entries = readEntriesSync(file)
-      if (entries.length === 0) return { ok: true, removed: 0 }
-      const fitted = fitSection(entries, 2048)
-      if (fitted.length === entries.length) return { ok: true, removed: 0 }
-      const res = writeEntriesAtomicSync(file, fitted)
-      if (!res.ok) return { ok: false, error: res.error }
-      return { ok: true, removed: entries.length - fitted.length }
+      const archiveFile = this.archiveFileFor(target, cwd)
+      for (const entry of moving) {
+        const res = appendEntryAtomicSync(archiveFile, entry)
+        if (!res.ok) return { ok: false as const, error: `archive append failed: ${res.error}` }
+      }
+      const remaining = readEntriesSync(file).filter((e) => !moving.includes(e))
+      const backup = createBackupSync(file)
+      writeAtomicSync(file, serializeEntries(remaining))
+      return { ok: true as const, archived: moving.length, backup }
     })
   }
-}
-
-// fitSection must be available before store methods use it; declared in snapshot module but duplicated here for host use
-function fitSection(entries: string[], cap: number): string[] {
-  if (entries.length === 0) return []
-  const keptDesc: string[] = []
-  let used = 0
-  for (let i = entries.length - 1; i >= 0; i--) {
-    const size = Buffer.byteLength(entries[i], 'utf8')
-    if (used + size > cap && keptDesc.length > 0) break
-    keptDesc.push(entries[i])
-    used += size
-  }
-  return keptDesc.reverse()
 }
 
 // Re-export ArchiveStore for direct use (matches legacy)
