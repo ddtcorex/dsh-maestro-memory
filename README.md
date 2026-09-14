@@ -125,10 +125,12 @@ defaults to `true` and an actual write needs `confirm: true`):
 | `memory.repair` | Splits entries glued without the `§` delimiter, drops exact duplicates and moves a trailing `[summary:…]` to its canonical header position, across every store file. Reports `files / changed / split / deduped / relocated`. |
 | `memory.maintenance` | Plans (and optionally applies) the archive of the oldest entries of `memory`/`user`/`key`/`project` beyond `DEFAULT_ARCHIVE_POLICY` (keep-bytes + max-age). Overgrown entries move to the track's `*-archive.md`; they are never dropped. |
 
-Two repair passes also run once at boot, each gated by its own flag file under
-`<root>/.maestro-memory/` (`maestroMetaDir`): `key-repaired-v1` (KEY.md
-delimiters) and `delimiter-repaired-v2` (every store file, with the run report
-written into the flag).
+One repair pass runs once at boot, gated by a flag file under
+`<root>/.maestro-memory/` (`maestroMetaDir`): `delimiter-repaired-v3` covers
+every store file and writes its run report into the flag. (v1 was a KEY-only pass
+that had been a silent no-op — it was called with a bogus cwd — and v2 covered
+the store without the stray-delimiter split; the versioned flag is what lets an
+existing machine pick up a new repair rule exactly once.)
 
 ## Maintenance
 

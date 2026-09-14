@@ -10,7 +10,7 @@ All notable changes to this project are documented in this file. Format follows
 - **Versioned whole-store repair** (`storage/repair.ts`, `memory/repair-runner.ts`, endpoint
   `memory.repair`) — a pure planner splits entries glued without the `§` delimiter, drops exact
   duplicates and moves a trailing `[summary:…]` to its canonical header position. A boot pass
-  (`delimiter-repaired-v2`) applies it to every store file; the v1 pass covered `KEY.md` only, which
+  (`delimiter-repaired-v3`) applies it to every store file; the v1 pass covered `KEY.md` only, which
   is why the global `MEMORY.md` kept a glued duplicate that consumed the whole `# Global Memory`
   section and pushed a hard rule out of every prompt. Measured on the live store: **480 redundant
   entries across 38 files**, and 111 of 150 `KEY.md` entries carrying an unreadable summary tag.
@@ -46,6 +46,11 @@ All notable changes to this project are documented in this file. Format follows
   `[id:…]`, so an entry and its summary-tagged twin hashed differently and the union merge kept both
   (480 redundant entries across 38 files after the 2026-09-14 two-machine sync). It now uses the
   shared body predicate.
+- **A `§` glued to content is now repaired on every track.** The v1 KEY-only boot pass was a silent
+  no-op — it was called with a bogus cwd, so it resolved `projects/<sha1('')>/KEY.md`, found nothing and
+  returned `{repaired: 0}` — and `repairKeyDelimiter()` now aliases `repairFile()` instead of carrying a
+  second copy of the split logic. It also reports entries *recovered* rather than the file's total entry
+  count, which made a no-op on a clean file look like a 2-entry repair.
 - **`applyBatch` rollback missed entries.** It removed by matching the caller's raw content as a
   substring of the stored entry, which stops matching once the summary tag moves to the header; the
   batch now removes by the final stored text `add()` reports.
