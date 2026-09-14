@@ -60,7 +60,21 @@ host restart. `threshold` counts consecutive *working* human turns with no
 
 `USER + MEMORY + KEY (branch-filtered) + Project Context (auto-recall top-4, 600 chars each, cap 1024) + Recent Daily (last 2 days, 512) + header + discipline note`
 
-Caps: `memory 2048 / user 4096 / key 6144 / recentDaily 512 / autoRecall 1024`.
+Caps: `memory 2048 / user 4096 / key 6144 / recentDaily 512 / autoRecall 1024`, plus
+per-section entry budgets `memory 8 / user 8 / key 12 / recentDaily 2 / autoRecall 4`.
+
+A cap is hard in **both** dimensions. The newest entry is always kept — compacted
+to `head + [summary:…]` when it carries a summary tag. An untagged entry larger
+than twice its byte cap is truncated with an explicit `…[truncated]` marker
+instead of being kept whole: before that rule, a single 2,293-byte global entry
+owned the 2,048-byte section and pushed every other entry out of the prompt.
+
+**Cost reporting.** `renderSnapshotWithStats` (the renderer behind
+`memory:snapshot`) reports the bytes, entry count and excluded-entry count of
+every section. The host keeps the last 50 renders in memory and returns them as
+`cost` on `/dsh-maestro-memory-health`: `samples`, `last`, `medianTotalBytes`,
+`maxTotalBytes`, `medianBySection`. Entry text is never retained — byte counts
+only.
 
 **Write watchdog.** With `writeGuard.enabled`, the host counts consecutive human
 turns in which work happened but no `daily`/`project` entry was written
@@ -102,6 +116,36 @@ force — a human writing `key` here is equivalent to approving a queued
 suggestion.
 
 RPC: `/dsh-maestro-memory` + loopback `/dsh-maestro-memory-health` + `/dsh-maestro-memory-propose`.
+
+Maintenance endpoints on `/dsh-maestro-memory` (both **preview-first**: `dryRun`
+defaults to `true` and an actual write needs `confirm: true`):
+
+| Endpoint | What it does |
+| --- | --- |
+| `memory.repair` | Splits entries glued without the `§` delimiter, drops exact duplicates and moves a trailing `[summary:…]` to its canonical header position, across every store file. Reports `files / changed / split / deduped / relocated`. |
+| `memory.maintenance` | Plans (and optionally applies) the archive of the oldest entries of `memory`/`user`/`key`/`project` beyond `DEFAULT_ARCHIVE_POLICY` (keep-bytes + max-age). Overgrown entries move to the track's `*-archive.md`; they are never dropped. |
+
+**Archive vs. the two-machine sync.** `sync/` merges `MEMORY.md`, `KEY.md` and `KEY-archive.md`
+as a **union** — it never drops a version, and project/global entries carry no `[id:…]`, so a
+*deletion* on one machine is indistinguishable from "the other machine has not seen it yet".
+Consequences worth knowing before archiving:
+
+- Archiving on ONE machine only is not stable: the next union merge pulls the archived entries
+  back into the live file, because the peer still carries them there. Archive on every machine
+  (same policy) so both sides agree and the union is a no-op, or archive with sync disabled.
+- `MEMORY-archive.md` is **not** in the merge set (only `KEY-archive.md` is), so a project-track
+  archive stays local. That is safe for the live file but means the two machines' archive files
+  can legitimately differ.
+- The archive does not change what the prompt shows: `# Project Key Memory` is capped at 6,144 B
+  and `# Project Context` at the newest 4 entries, both far below the archive policy's keep
+  budget. Verified on the live store: rendering was byte-identical before and after the run.
+
+One repair pass runs once at boot, gated by a flag file under
+`<root>/.maestro-memory/` (`maestroMetaDir`): `delimiter-repaired-v3` covers
+every store file and writes its run report into the flag. (v1 was a KEY-only pass
+that had been a silent no-op — it was called with a bogus cwd — and v2 covered
+the store without the stray-delimiter split; the versioned flag is what lets an
+existing machine pick up a new repair rule exactly once.)
 
 ## Maintenance
 

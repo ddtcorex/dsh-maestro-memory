@@ -3,6 +3,8 @@
  * Pure functions, no I/O.
  */
 
+import { entryBodyKey } from '../storage/atomic-store.ts'
+
 const MEMORY_ID_RE = /^\[id:\s*([0-9a-f]{8})\]\s*/i
 
 export interface ConflictRecord {
@@ -29,11 +31,16 @@ function normalizeEntry(entry: string): string {
   return String(entry).trim()
 }
 
+/**
+ * Body identity for the union merge — the SAME predicate the caller (`add`) and
+ * the file guard use, so the three can never disagree.
+ *
+ * It used to strip only the id. An entry and its summary-tagged twin therefore
+ * hashed differently, and the 2026-09-14 two-machine sync kept both — 480
+ * redundant entries across 38 files, re-created by every later sync.
+ */
 function contentHash(entry: string): string {
-  // strip id prefix for comparison of body? But for modifiedBoth we want body difference
-  // Compare full stripped id content; if id same but body differs => conflict
-  const withoutId = String(entry).replace(MEMORY_ID_RE, '').trim()
-  return withoutId
+  return entryBodyKey(entry)
 }
 
 /**

@@ -5,6 +5,8 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import { existsSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { MaestroMemoryStore } from './memory/store.ts'
+import { repairAllTracks } from './memory/repair-runner.ts'
+import { planArchive, DEFAULT_ARCHIVE_POLICY } from './memory/maintenance.ts'
 import { applyBatch } from './memory/batch.ts'
 import { buildFeedbackLine } from './memory/feedback.ts'
 import { TodoStore, resolveQuadrant, DEFAULT_VIEW_LIMIT } from './todo/store.ts'
@@ -16,7 +18,8 @@ import * as migration from './migration/service.ts'
 import { SyncService } from './sync/service.ts'
 import { RealGitAdapter } from './sync/git.ts'
 import { listSkillsSync, resolveDefaultMaestroSkillsDir } from './skills-browser.ts'
-import { renderSnapshot } from './prompt/snapshot.ts'
+import { renderSnapshotWithStats } from './prompt/snapshot.ts'
+import { createCostTracker } from './cost-tracker.ts'
 import { installAutoMemoryHooks, DEFAULT_AUTO_MEMORY, type AutoMemoryOptions } from './auto-memory.ts'
 import { computeFiveDim } from './health-score.ts'
 import { createWriteGapCounter, isGuardedTrack } from './memory/write-guard.ts'
@@ -106,31 +109,38 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
   // Per-turn write watchdog (opt-in). The counter lives for the process; it is
   // a pacing aid for drift inside one run, not durable state.
   const writeGuard = createWriteGapCounter(ctx, () => writeGuardConfig.enabled)
+  // What the snapshot is costing the prompt, per section. In-memory only: a
+  // restart starts a fresh window on purpose (same reasoning as the gap counter).
+  const costTracker = createCostTracker()
 
-  // One-time KEY.md delimiter repair (guarded by flag file)
+  // One-time whole-store repair, versioned by flag file.
+  //
+  // v1 was a KEY.md-only pass that had been a silent no-op since it was written:
+  // it called repairKeyDelimiter() with a bogus cwd, so it resolved
+  // `projects/<sha1('')>/KEY.md`, found nothing and returned `{repaired: 0}`.
+  // It is deleted; planRepair() now covers the class it was meant to handle
+  // (a `§` glued to content) for every track, not just KEY.md.
+  //
+  // v2 repaired the store the 2026-09-09 migration corrupted — 480 duplicate
+  // entries across 38 files, and the global MEMORY.md glued into one blob that
+  // pushed a hard rule out of every prompt.
+  //
+  // v3 adds the stray-delimiter split, so machines that already ran v2 pick it
+  // up once without re-running the earlier passes.
   ctx.effect(() => {
-    const flagFile = join(maestroMetaDir(root), 'key-repaired-v1')
+    const flagFile = join(maestroMetaDir(root), 'delimiter-repaired-v3')
     if (!existsSync(flagFile)) {
-      // Attempt repair for any project that has a KEY.md
+      let report: unknown = null
       try {
-        const projectsDir = join(root, 'projects')
-        if (existsSync(projectsDir)) {
-          for (const projectHash of readdirSync(projectsDir)) {
-            const keyFile = join(projectsDir, projectHash, 'KEY.md')
-            if (existsSync(keyFile)) {
-              store.repairKeyDelimiter(keyFile.replace(join(root, 'projects', projectHash, 'KEY.md'), ''))
-            }
-          }
-        }
+        report = repairAllTracks(root, { dryRun: false })
       } catch {}
-      // Write flag to prevent re-running
       try {
         mkdirSync(maestroMetaDir(root), { recursive: true })
-        writeFileSync(flagFile, 'ok', 'utf8')
+        writeFileSync(flagFile, JSON.stringify({ at: new Date().toISOString(), report }), 'utf8')
       } catch {}
     }
     return () => {}
-  }, 'maestro-memory: key-repair')
+  }, 'maestro-memory: delimiter-repair')
 
   // Auto-memory (opt-in, default disabled) — session/event → store
   ctx.effect(() => {
@@ -161,11 +171,16 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
         const due = writeGuardConfig.enabled
           && !isSubagent
           && writeGuard.gapOf(agent) >= writeGuardConfig.threshold
-        return renderSnapshot(
+        const { text, stats } = renderSnapshotWithStats(
           store,
           { cwd, branch, sessionId, sessionName, isSubagent },
           due ? { writeGuard: { threshold: writeGuardConfig.threshold } } : {},
         )
+        // Pacing/stats must never fail a turn.
+        try {
+          costTracker.record(stats)
+        } catch {}
+        return text
       },
     })
     return () => {
@@ -641,6 +656,40 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
         case 'status': {
           return { ok: true, queue: queue.read().length, blocked: migration.isWriteBlocked(root) }
         }
+        case 'memory.repair': {
+          // Preview-first: cleaning a store file is a write, so `dryRun` is the
+          // default and an actual repair needs an explicit confirm.
+          const dryRun = payload?.dryRun !== false
+          if (!dryRun && payload?.confirm !== true) {
+            return { ok: false, error: 'confirm:true required to write repairs' }
+          }
+          const report = repairAllTracks(root, { dryRun })
+          return { ok: true, dryRun, report }
+        }
+        case 'memory.maintenance': {
+          // Preview-first: growth is bounded by MOVING the oldest entries to the
+          // track's archive file, never by dropping them, and the first real run
+          // must be a human decision made against these numbers.
+          const dryRun = payload?.dryRun !== false
+          const cwdArg = typeof payload?.cwd === 'string' && payload.cwd.trim() ? payload.cwd.trim() : undefined
+          const plan: Record<string, { keep: number; archive: number; archiveBytes: number }> = {}
+          for (const track of ['memory', 'user', 'key', 'project'] as const) {
+            if ((track === 'key' || track === 'project') && !cwdArg) continue
+            const entries = store.list(track as any, cwdArg as any)
+            const p = planArchive(entries, DEFAULT_ARCHIVE_POLICY[track])
+            plan[track] = {
+              keep: p.keep.length,
+              archive: p.archive.length,
+              archiveBytes: p.archive.reduce((n, e) => n + Buffer.byteLength(e, 'utf8'), 0),
+            }
+            if (!dryRun && p.archive.length > 0) {
+              if (payload?.confirm !== true) return { ok: false, error: 'confirm:true required to write' }
+              const res = store.applyArchive(track as any, cwdArg, p.archive)
+              if (!res.ok) return { ok: false, error: res.error }
+            }
+          }
+          return { ok: true, dryRun, plan }
+        }
         case 'migration.inspect': {
           const insp = await migration.inspect(root)
           return { ...insp }
@@ -763,10 +812,13 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
     const healthChannel = '/dsh-maestro-memory-health'
     const healthHandler = async (endpoint: string, payload: any) => {
       try {
+        // Cost is a property of the renderer, not of any one project, so it is
+        // reported on both paths — including when cwd is missing.
+        const cost = costTracker.snapshot()
         const cwdRaw = (payload && typeof payload.cwd === 'string' && payload.cwd.trim()) ? payload.cwd.trim() : ''
         // Health requires explicit cwd; if missing, return empty (client should pass sessionCwd)
         if (!cwdRaw) {
-          return { ok: true, value: { project: { total: 0, withSummary: 0, coverage: 100 }, daily: { counts: [0,0,0,0,0,0,0] }, longest: [] } }
+          return { ok: true, value: { project: { total: 0, withSummary: 0, coverage: 100 }, daily: { counts: [0,0,0,0,0,0,0] }, longest: [], cost } }
         }
         const cwd = cwdRaw
         const projectEntries = store.list('project', cwd)
@@ -794,7 +846,7 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
           hasSanitize: true,
           hasGatedQueue: true,
         })
-        const health = { project: { total, withSummary, coverage }, daily: { counts: dailyCounts }, longest, fiveDim }
+        const health = { project: { total, withSummary, coverage }, daily: { counts: dailyCounts }, longest, fiveDim, cost }
         return { ok: true, value: health }
       } catch (e: any) {
         return { ok: false, error: e?.message ?? String(e) }

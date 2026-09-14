@@ -42,7 +42,10 @@ describe('feedback wiring through adds', () => {
     ])
     expect(res).toMatchObject({ ok: true })
     const stored = store.list('project', cwd)[0]
-    expect(stored).toContain('[2026-08-26] shipped caps')
+    // The summary tag is inserted after the entry header (its canonical
+    // position), so the caller's raw content is no longer a contiguous prefix
+    // of what was stored — assert the content survives, not its adjacency.
+    expect(stored).toContain('shipped caps')
     expect(stored).toContain('[Feedback] sentiment=positive; category="prompt-size"')
   })
 

@@ -21,8 +21,10 @@ import {
   readEntries,
   appendEntryAtomic,
   writeEntriesAtomic,
+  createBackupSync,
   withLockSync,
 } from '../storage/atomic-store.ts'
+import { planRepair } from '../storage/repair.ts'
 import {
   resolveMemoryRoot,
   globalMemoryPath,
@@ -50,6 +52,16 @@ import { desensitize } from './sanitize.ts'
 
 export type MemoryTarget = 'memory' | 'global' | 'user' | 'project' | 'key' | 'daily'
 export type MemoryAction = 'add' | 'list' | 'replace' | 'remove' | 'archive' | 'expand'
+
+/** Outcome of repairing one store file (see {@link MaestroMemoryStore.repairFile}). */
+export type RepairFileResult =
+  | { ok: true; changed: boolean; before: number; after: number; split: number; deduped: number; relocated: number; backup: string | null }
+  | { ok: false; error: string }
+
+/** Outcome of moving entries out of a live track (see {@link MaestroMemoryStore.applyArchive}). */
+export type ApplyArchiveResult =
+  | { ok: true; archived: number; backup: string | null }
+  | { ok: false; error: string }
 
 export interface ListOpts {
   filter?: string
@@ -254,12 +266,30 @@ export class MaestroMemoryStore {
     return `[${todayStamp()} ${timeStamp()}] ${t}`
   }
 
+  /**
+   * Ensure an entry carries a summary tag in the CANONICAL position.
+   *
+   * The grammar puts `[summary:…]` immediately after the id/timestamp header,
+   * and that is where `parseEntrySummary`, `stripEntrySummary` and the
+   * snapshot's `compactToHead` read it. This method used to append the tag at
+   * the END of the entry instead, which made every auto-summarized entry
+   * invisible to the compactor: `# Recent Daily` (512 B cap) rendered 1,518 B
+   * and the global section 2,303 B because nothing could ever be compacted.
+   *
+   * So: keep a canonical tag as-is, move a trailing one to the header, and only
+   * then fall back to generating one.
+   */
   private ensureAutoSummary(entry: string, target: MemoryTarget): string {
-    if (target === 'daily') return entry
-    if (SUMMARY_TAG_RE.test(entry)) return entry
+    if (parseEntrySummary(entry) !== null) return entry
+    const trailing = /\[summary:([^\]]*)\]\s*$/.exec(entry)
+    if (trailing) {
+      const body = entry.slice(0, trailing.index).trimEnd()
+      const relocated = this.applySummaryTag(body, trailing[1])
+      if (relocated !== body) return relocated
+    }
     const s = autoSummary(entry, 80).replace(/[\n\r\t\]]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120)
     if (!s) return entry
-    return `${entry.trimEnd()} [summary:${s}]`
+    return this.applySummaryTag(entry, s) || entry
   }
 
   // -------------------------------------------------------------------------
@@ -371,7 +401,7 @@ export class MaestroMemoryStore {
     entry: string,
     cwd?: string,
     opts: { branches?: string; summary?: string; date?: string; desensitize?: boolean } = {},
-  ): { ok: true; duplicate?: boolean; id?: string } | { ok: false; error: string } {
+  ): { ok: true; duplicate?: boolean; id?: string; entry?: string } | { ok: false; error: string } {
     try {
       this.assertNotBlocked()
     } catch (e: any) {
@@ -422,13 +452,12 @@ export class MaestroMemoryStore {
     } catch (e: any) {
       return { ok: false, error: e?.message ?? String(e) }
     }
-    // Dedupe with stripped id+summary so summary difference doesn't create duplicate
+    // Dedupe with the shared body key (id- and summary-insensitive) so a
+    // differing summary can never create a duplicate. `isDuplicate` is the same
+    // predicate the file guard and the sync merge use.
     try {
       const existing = readEntriesSync(file)
-      const stripForDedupe = (s: string) => s.replace(/\[summary:[^\]]*\]\s*/g, '').replace(/^\[id:\s*[0-9a-f]{8}\]\s*/i, '').trim()
-      const probe = stripForDedupe(content)
-      const isDup = existing.some((e) => stripForDedupe(e) === probe)
-      if (isDup) return { ok: true, duplicate: true }
+      if (isDuplicate(existing, content)) return { ok: true, duplicate: true }
     } catch {
       // read failure → treat as no duplicate, let append handle it
     }
@@ -437,7 +466,11 @@ export class MaestroMemoryStore {
     if (res.duplicate) return { ok: true, duplicate: true }
     // Extract generated id if any
     const m = /^\[id:\s*([0-9a-f]{8})\]/i.exec(content)
-    return { ok: true, id: m ? m[1].toLowerCase() : undefined }
+    // `entry` is the FINAL stored text (date prefix, summary tag, feedback line,
+    // id). Callers that must undo this write need it: the tag is inserted after
+    // the header, so the caller's raw content is no longer a substring of what
+    // was stored and a substring-based removal would silently miss.
+    return { ok: true, id: m ? m[1].toLowerCase() : undefined, entry: content }
   }
 
   /** Replace unique entry matching substring */
@@ -676,75 +709,115 @@ export class MaestroMemoryStore {
   }
 
   /**
-   * Repair malformed KEY.md delimiter.
-   * Reads raw file, splits on flexible delimiter (§\n or \n§\n), re-serializes canonical (\n§\n).
-   * Runs atomically (bypasses drift guard for repair). Returns { ok: true, repaired: count }.
+   * Repair one store file in place: split entries that were glued without the
+   * `§` delimiter, drop exact duplicates, back up first.
+   *
+   * Pure planning lives in `storage/repair.ts`; this method owns the lock, the
+   * backup and the atomic write. A clean file (or a missing one) is a no-op and
+   * produces no backup — repairing must never churn a healthy store.
    */
-  repairKeyDelimiter(cwd: string): { ok: true; repaired: number } | { ok: false; error: string } {
+  repairFile(filePath: string): RepairFileResult {
     try {
       this.assertNotBlocked()
     } catch (e: any) {
       return { ok: false, error: e?.message ?? String(e) }
     }
-    const file = this.fileFor('key', cwd)
-    return withLockSync(dirname(file), () => {
-      let raw = ''
-      try {
-        raw = readFileSync(file, 'utf8')
-      } catch (error: unknown) {
-        const code = (error as NodeJS.ErrnoException).code
-        if (code !== 'ENOENT') throw error
-        raw = ''
+    try {
+      if (!existsSync(filePath)) {
+        return { ok: true, changed: false, before: 0, after: 0, split: 0, deduped: 0, relocated: 0, backup: null }
       }
-      if (!raw.trim()) return { ok: true, repaired: 0 }
-      // Lenient split: handle both §\n and \n§\n
-      const entries = raw
-        .split(/\n?§\n?/)
-        .map(e => e.trim())
-        .filter(e => e.length > 0)
-      if (entries.length <= 1) return { ok: true, repaired: 0 } // already canonical or empty/single
-      // Re-serialize canonical (bypass drift guard for repair)
-      const canonical = serializeEntries(entries)
-      writeAtomicSync(file, canonical)
-      return { ok: true, repaired: entries.length }
+    } catch (e: any) {
+      return { ok: false, error: e?.message ?? String(e) }
+    }
+    return withLockSync(dirname(filePath), () => {
+      const raw = readFileSync(filePath, 'utf8')
+      const plan = planRepair(raw)
+      if (!plan.changed) {
+        return {
+          ok: true as const,
+          changed: false,
+          before: plan.before,
+          after: plan.after,
+          split: plan.split,
+          deduped: plan.deduped,
+          relocated: plan.relocated,
+          backup: null,
+        }
+      }
+      const backup = createBackupSync(filePath)
+      writeAtomicSync(filePath, plan.text)
+      return {
+        ok: true as const,
+        changed: true,
+        before: plan.before,
+        after: plan.after,
+        split: plan.split,
+        deduped: plan.deduped,
+        relocated: plan.relocated,
+        backup,
+      }
     })
   }
 
   /**
-   * Prune global memory (MEMORY.md) to fit the snapshot byte cap.
-   * Keeps the newest entries that fit 2048 bytes; older overflow is dropped.
+   * Repair malformed KEY.md delimiter.
+   * Kept as a thin alias over {@link repairFile} so there is exactly ONE repair
+   * implementation: this method used to carry its own lenient `§` split, which
+   * is the same logic `planRepair` needs for every track. (Its only caller —
+   * the v1 boot pass — was deleted on 2026-09-14: it passed a bogus cwd, so it
+   * was a silent no-op.)
+   *
+   * Returns the number of entries recovered by splitting.
    */
-  pruneGlobalMemory(): { ok: true; removed: number } | { ok: false; error: string } {
+  repairKeyDelimiter(cwd: string): { ok: true; repaired: number } | { ok: false; error: string } {
+    let file: string
+    try {
+      file = this.fileFor('key', cwd)
+    } catch (e: any) {
+      return { ok: false, error: e?.message ?? String(e) }
+    }
+    const res = this.repairFile(file)
+    if (!res.ok) return { ok: false, error: res.error }
+    return { ok: true, repaired: res.split }
+  }
+
+  /**
+   * Move `archive` out of the live track file into its `*-archive.md`.
+   *
+   * Append-to-archive happens first: if that write fails, the live file is
+   * untouched and nothing is lost. The live file is then rewritten (backup
+   * first, lock held) with the entries that remain.
+   *
+   * This replaces the removed `pruneGlobalMemory()`, which fitted the live file
+   * to the snapshot cap by DROPPING the overflow — a data-destroying operation
+   * with no caller. Archiving keeps the entries queryable instead.
+   */
+  applyArchive(target: MemoryTarget, cwd: string | undefined, archive: string[]): ApplyArchiveResult {
     try {
       this.assertNotBlocked()
     } catch (e: any) {
       return { ok: false, error: e?.message ?? String(e) }
     }
-    const file = this.fileFor('memory')
+    const moving = archive.filter((e) => String(e ?? '').trim().length > 0)
+    if (moving.length === 0) return { ok: false, error: 'nothing to archive' }
+    let file: string
+    try {
+      file = this.fileFor(target, cwd)
+    } catch (e: any) {
+      return { ok: false, error: e?.message ?? String(e) }
+    }
     return withLockSync(dirname(file), () => {
-      const entries = readEntriesSync(file)
-      if (entries.length === 0) return { ok: true, removed: 0 }
-      const fitted = fitSection(entries, 2048)
-      if (fitted.length === entries.length) return { ok: true, removed: 0 }
-      const res = writeEntriesAtomicSync(file, fitted)
-      if (!res.ok) return { ok: false, error: res.error }
-      return { ok: true, removed: entries.length - fitted.length }
+      const archiveFile = this.archiveFileFor(target, cwd)
+      for (const entry of moving) {
+        const res = appendEntryAtomicSync(archiveFile, entry)
+        if (!res.ok) return { ok: false as const, error: `archive append failed: ${res.error}` }
+      }
+      const remaining = readEntriesSync(file).filter((e) => !moving.includes(e))
+      const backup = createBackupSync(file)
+      writeAtomicSync(file, serializeEntries(remaining))
+      return { ok: true as const, archived: moving.length, backup }
     })
   }
-}
-
-// fitSection must be available before store methods use it; declared in snapshot module but duplicated here for host use
-function fitSection(entries: string[], cap: number): string[] {
-  if (entries.length === 0) return []
-  const keptDesc: string[] = []
-  let used = 0
-  for (let i = entries.length - 1; i >= 0; i--) {
-    const size = Buffer.byteLength(entries[i], 'utf8')
-    if (used + size > cap && keptDesc.length > 0) break
-    keptDesc.push(entries[i])
-    used += size
-  }
-  return keptDesc.reverse()
 }
 
 // Re-export ArchiveStore for direct use (matches legacy)
