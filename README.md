@@ -125,6 +125,21 @@ defaults to `true` and an actual write needs `confirm: true`):
 | `memory.repair` | Splits entries glued without the `§` delimiter, drops exact duplicates and moves a trailing `[summary:…]` to its canonical header position, across every store file. Reports `files / changed / split / deduped / relocated`. |
 | `memory.maintenance` | Plans (and optionally applies) the archive of the oldest entries of `memory`/`user`/`key`/`project` beyond `DEFAULT_ARCHIVE_POLICY` (keep-bytes + max-age). Overgrown entries move to the track's `*-archive.md`; they are never dropped. |
 
+**Archive vs. the two-machine sync.** `sync/` merges `MEMORY.md`, `KEY.md` and `KEY-archive.md`
+as a **union** — it never drops a version, and project/global entries carry no `[id:…]`, so a
+*deletion* on one machine is indistinguishable from "the other machine has not seen it yet".
+Consequences worth knowing before archiving:
+
+- Archiving on ONE machine only is not stable: the next union merge pulls the archived entries
+  back into the live file, because the peer still carries them there. Archive on every machine
+  (same policy) so both sides agree and the union is a no-op, or archive with sync disabled.
+- `MEMORY-archive.md` is **not** in the merge set (only `KEY-archive.md` is), so a project-track
+  archive stays local. That is safe for the live file but means the two machines' archive files
+  can legitimately differ.
+- The archive does not change what the prompt shows: `# Project Key Memory` is capped at 6,144 B
+  and `# Project Context` at the newest 4 entries, both far below the archive policy's keep
+  budget. Verified on the live store: rendering was byte-identical before and after the run.
+
 One repair pass runs once at boot, gated by a flag file under
 `<root>/.maestro-memory/` (`maestroMetaDir`): `delimiter-repaired-v3` covers
 every store file and writes its run report into the flag. (v1 was a KEY-only pass
