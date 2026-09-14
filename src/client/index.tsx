@@ -160,24 +160,23 @@ const MEM_CSS = `
 @media (max-width:480px) { .memx-field { flex-direction:column; align-items:stretch; } .memx-input { flex-basis:auto; width:100%; max-width:100%; } }
 @media (min-width:1440px) { .memx { max-width:1280px; margin:0 auto; } }
 
-/* iOS WebKit zoom guard — the panel keeps its own 13px scale.
+/* iOS 16px field floor hold — this panel holds its fields at the same 16px.
    dsh-maestro-mobile holds EVERY text field on the page at >=16px under
    html[data-mobile-nav-ios] inside this exact predicate, because iOS Safari
    magnifies the visual viewport when a focused field computes below 16px and
-   only reverts on blur. Left alone, that floor makes this panel's placeholders
-   and typed text 3px larger than every card and label around them. The Memory
-   tab is a dense tool surface designed at 13px, so it opts its own fields out
-   of the floor rather than dragging the whole panel up: the tab keeps the size
-   it was designed with. The trade-off is the one the floor exists to avoid —
-   iOS magnifies the viewport while one of these fields has focus.
+   only reverts on blur. An earlier revision opted this panel's fields back out
+   to the 13px it was designed at — and every tap on those fields zoomed the
+   page on iPhone. Function beats pixels: hold 16px here (the 13px body scale
+   elsewhere in the panel is untouched, as is every field on Android/desktop,
+   which never carry the marker).
    The :not(#dsh-memx-own-field-size) clause matches every element (no node
    carries that id) and is there purely to add id-level specificity: the floor
    selector carries ten :not([type=...]) clauses, so an equal-specificity
-   !important rule would lose and the fields would silently grow back. */
+   !important rule would lose and the fields could silently shrink back. */
 @media (max-width: 1023px) and (pointer: coarse) {
   html[data-mobile-nav-ios] .memx input:not(#dsh-memx-own-field-size),
   html[data-mobile-nav-ios] .memx textarea:not(#dsh-memx-own-field-size),
-  html[data-mobile-nav-ios] .memx select:not(#dsh-memx-own-field-size) { font-size:13px !important; }
+  html[data-mobile-nav-ios] .memx select:not(#dsh-memx-own-field-size) { font-size:16px !important; }
 }
 `
 
