@@ -91,9 +91,12 @@ export function applyBatch(
       added.push({
         index: i,
         target: target as MemoryTarget,
-        // key entries carry a generated id token; other tracks are stored
-        // verbatim, so the trimmed stored content is the precise removal token.
-        token: res.id !== undefined ? `[id:${res.id}]` : content.trim(),
+        // key entries carry a generated id token; other tracks are removed by
+        // the FINAL stored text `add()` reports, not by the caller's raw
+        // content: `add()` inserts the summary tag after the entry header, so
+        // the raw content stops being a substring of what was written and a
+        // substring-based rollback would silently leave the entry behind.
+        token: res.id !== undefined ? `[id:${res.id}]` : (res.entry ?? content.trim()),
         cwd: e.cwd,
         date: e.date,
       })

@@ -18,6 +18,7 @@
  * @module storage/repair
  */
 import { parseEntries, serializeEntries } from './atomic-store.ts'
+import { entryHeadPrefix, parseEntrySummary } from './legacy-format.ts'
 
 /** An entry head at line start: `[YYYY-MM-DD]`, `[YYYY-MM-DD HH:MM]`, optional `[id:xxxxxxxx]` first. */
 const HEAD_LINE_RE = /^(?:\[id:\s*[0-9a-f]{8}\]\s*)?\[\d{4}-\d{2}-\d{2}(?:[ T][\d:]*)?\]/
@@ -34,6 +35,8 @@ export interface RepairPlan {
   split: number
   /** Entries removed as exact duplicates. */
   deduped: number
+  /** Entries whose trailing `[summary:…]` tag was moved to the header position. */
+  relocated: number
   /** True when `text` differs from the input. */
   changed: boolean
   /** Repaired entries, in file order. */
@@ -64,6 +67,28 @@ function entryKey(entry: string): string {
     .trim()
 }
 
+/**
+ * Move a trailing `[summary:…]` tag to the canonical header position.
+ *
+ * The grammar places the tag immediately after the id/timestamp header, and
+ * that is the only position `parseEntrySummary` recognises. The auto-summary
+ * writer appended it at the END of the entry instead, so the tag existed but
+ * was invisible to the snapshot's compactor: `# Recent Daily` (cap 512 B)
+ * rendered 1,518 B and the global section 2,303 B, because no auto-summarized
+ * entry could ever be compacted. Deterministic and idempotent.
+ */
+function relocateTrailingSummary(entry: string): string {
+  if (parseEntrySummary(entry) !== null) return entry
+  const trailing = /\[summary:([^\]]*)\]\s*$/.exec(entry)
+  if (trailing === null) return entry
+  const body = entry.slice(0, trailing.index).trimEnd()
+  const head = entryHeadPrefix(body)
+  if (!head) return entry
+  const rest = body.slice(head.length).replace(/^\s+/, '')
+  const rebuilt = `${head.trimEnd()} [summary:${trailing[1]}] ${rest}`.trimEnd()
+  return rebuilt.trim() === '' ? entry : rebuilt
+}
+
 /** Drop later copies of an entry, keeping the first occurrence. */
 function dedupe(entries: string[]): { entries: string[]; removed: number } {
   const seen = new Set<string>()
@@ -82,7 +107,9 @@ export function planRepair(raw: string): RepairPlan {
   const source = String(raw ?? '')
   const parsed = parseEntries(source)
   const splitEntries = parsed.flatMap(splitGlued)
-  const { entries, removed } = dedupe(splitEntries)
+  const relocatedEntries = splitEntries.map(relocateTrailingSummary)
+  const relocated = relocatedEntries.reduce((n, e, i) => (e === splitEntries[i] ? n : n + 1), 0)
+  const { entries, removed } = dedupe(relocatedEntries)
   const text = serializeEntries(entries)
   // A blank file is canonical by `isCanonical()`'s own definition, so repairing
   // it would only rewrite whitespace and mint a pointless backup: no-op.
@@ -92,6 +119,7 @@ export function planRepair(raw: string): RepairPlan {
     after: entries.length,
     split: splitEntries.length - parsed.length,
     deduped: removed,
+    relocated,
     changed,
     entries,
     text,

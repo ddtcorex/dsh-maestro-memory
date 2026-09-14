@@ -21,6 +21,14 @@ export interface SnapshotContext {
 /** Default per-section byte budgets for the snapshot prompt. */
 export const SNAPSHOT_SECTION_CAPS = { memory: 2048, user: 4096, key: 6144, recentDaily: 512, autoRecall: 1024 } as const
 
+/**
+ * Default per-section entry budgets. A byte cap alone lets one huge entry own
+ * the section and crowd out every other one — the live store had a single
+ * 2,293-byte global entry consuming a 2,048-byte section while a hard rule sat
+ * behind it, never injected.
+ */
+export const SNAPSHOT_SECTION_MAX_ENTRIES = { memory: 8, user: 8, key: 12, recentDaily: 2, autoRecall: 4 } as const
+
 export type SnapshotSectionKey = keyof typeof SNAPSHOT_SECTION_CAPS
 
 export interface SnapshotRenderOpts {
@@ -49,31 +57,61 @@ export interface FittedSection {
   bytes: number
   /** Entries the cap excluded. */
   dropped: number
+  /** Entries cut down because they exceeded the oversize ceiling. */
+  truncated: number
+}
+
+/** Cut an entry to `cap` UTF-8 bytes on a character boundary, with an explicit marker. */
+function truncateTo(entry: string, cap: number): string {
+  const marker = '…[truncated]'
+  const budget = Math.max(0, cap - Buffer.byteLength(marker, 'utf8'))
+  let out = ''
+  let used = 0
+  for (const ch of entry) {
+    const size = Buffer.byteLength(ch, 'utf8')
+    if (used + size > budget) break
+    out += ch
+    used += size
+  }
+  return `${out}${marker}`
 }
 
 /**
- * Keep the newest entries whose combined UTF-8 size (with separators) fits `cap`.
- * The newest entry is always kept — compacted to its summary head when oversized
- * and tagged; untagged oversize entries stay whole rather than vanishing.
+ * Keep the newest entries whose combined UTF-8 size (with separators) fits `cap`,
+ * at most `maxEntries` of them.
  *
- * Returns the drop count as well as the kept entries: without it, a store that
- * has outgrown its window and a cap that is too eager look identical from the
- * outside — which is how a hard rule silently stopped being injected.
+ * The newest entry is always kept — compacted to its summary head when oversized
+ * and tagged. An untagged oversize entry cannot be compacted, so it is kept whole
+ * only up to twice the cap; beyond that it is truncated with a visible marker and
+ * counted. Letting it through whole is what let one entry silently own a section.
+ *
+ * Returns the drop and truncation counts as well as the kept entries: without
+ * them, a store that has outgrown its window and a cap that is too eager look
+ * identical from the outside.
  */
-function fitSection(entries: string[], cap: number): FittedSection {
-  if (entries.length === 0) return { kept: [], bytes: 0, dropped: 0 }
+function fitSection(entries: string[], cap: number, maxEntries: number = Number.POSITIVE_INFINITY): FittedSection {
+  if (entries.length === 0) return { kept: [], bytes: 0, dropped: 0, truncated: 0 }
   const keptDesc: string[] = []
   let used = 0
+  let truncated = 0
   for (let i = entries.length - 1; i >= 0; i--) {
+    if (keptDesc.length >= maxEntries) break
     const isNewest = keptDesc.length === 0
     let candidate = entries[i]
-    if (isNewest && Buffer.byteLength(candidate, 'utf8') > cap) candidate = compactToHead(candidate)
+    if (isNewest && Buffer.byteLength(candidate, 'utf8') > cap) {
+      const compacted = compactToHead(candidate)
+      if (compacted !== candidate) candidate = compacted
+      if (Buffer.byteLength(candidate, 'utf8') > cap * 2) {
+        candidate = truncateTo(candidate, cap)
+        truncated += 1
+      }
+    }
     const cost = Buffer.byteLength(candidate, 'utf8') + (keptDesc.length ? SECTION_SEP.length : 0)
     if (!isNewest && used + cost > cap) break
     keptDesc.push(candidate)
     used += cost
   }
-  return { kept: keptDesc.reverse(), bytes: used, dropped: entries.length - keptDesc.length }
+  return { kept: keptDesc.reverse(), bytes: used, dropped: entries.length - keptDesc.length, truncated }
 }
 
 /**
@@ -96,6 +134,7 @@ export interface SectionStats {
   bytes: number
   entries: number
   dropped: number
+  truncated: number
 }
 
 /** Cost of one rendered snapshot. */
@@ -125,7 +164,7 @@ export function renderSnapshotWithStats(
   const sections: SectionStats[] = []
   const take = (key: SectionStats['key'], fitted: FittedSection, cap: number, text: string) => {
     parts.push(text)
-    sections.push({ key, cap, bytes: fitted.bytes, entries: fitted.kept.length, dropped: fitted.dropped })
+    sections.push({ key, cap, bytes: fitted.bytes, entries: fitted.kept.length, dropped: fitted.dropped, truncated: fitted.truncated })
   }
 
   // Header
@@ -138,8 +177,8 @@ export function renderSnapshotWithStats(
   }
 
   // Bounded memory sections — delegate branch filtering to store.list, then enforce byte caps
-  const mem = fitSection(store.list('memory'), caps.memory)
-  let user = fitSection(store.list('user'), caps.user)
+  const mem = fitSection(store.list('memory'), caps.memory, SNAPSHOT_SECTION_MAX_ENTRIES.memory)
+  let user = fitSection(store.list('user'), caps.user, SNAPSHOT_SECTION_MAX_ENTRIES.user)
   // Bootstrap USER.md from session context when missing/empty (no profile file yet)
   if (user.kept.length === 0 && (ctx.sessionName || ctx.sessionId)) {
     try {
@@ -152,14 +191,14 @@ export function renderSnapshotWithStats(
         if (profileLines.length) {
           const bootEntry = `[${stamp}] ${profileLines.join('; ')}`
           appendEntryAtomicSync(userFile, bootEntry)
-          user = fitSection(store.list('user'), caps.user)
+          user = fitSection(store.list('user'), caps.user, SNAPSHOT_SECTION_MAX_ENTRIES.user)
         }
       }
     } catch {}
   }
   const key = ctx.cwd
-    ? fitSection(store.list('key', ctx.cwd, ctx.branch ? { branch: ctx.branch } : {}), caps.key)
-    : { kept: [], bytes: 0, dropped: 0 }
+    ? fitSection(store.list('key', ctx.cwd, ctx.branch ? { branch: ctx.branch } : {}), caps.key, SNAPSHOT_SECTION_MAX_ENTRIES.key)
+    : { kept: [], bytes: 0, dropped: 0, truncated: 0 }
 
   if (mem.kept.length) take('memory', mem, caps.memory, `# Global Memory\n${mem.kept.join('\n---\n')}`)
   if (user.kept.length) take('user', user, caps.user, `# User Memory\n${user.kept.join('\n---\n')}`)
@@ -172,7 +211,7 @@ export function renderSnapshotWithStats(
       const proj = store.list('project', ctx.cwd)
       if (proj.length) {
         const newest4 = proj.slice(-4).map((e) => e.slice(0, 600))
-        const fitted = fitSection(newest4, (caps as any).autoRecall ?? 1024)
+        const fitted = fitSection(newest4, (caps as any).autoRecall ?? 1024, SNAPSHOT_SECTION_MAX_ENTRIES.autoRecall)
         if (fitted.kept.length) take('projectContext', fitted, (caps as any).autoRecall ?? 1024, `# Project Context\n${fitted.kept.join('\n---\n')}`)
       }
     } catch {}
@@ -186,7 +225,7 @@ export function renderSnapshotWithStats(
         const slice = refContent.slice(0, 2048)
         if (slice.trim().length > 0) {
           const bytes = Buffer.byteLength(slice, 'utf8')
-          take('reference', { kept: [slice], bytes, dropped: 0 }, 2048, `# Project Knowledge\n${slice}`)
+          take('reference', { kept: [slice], bytes, dropped: 0, truncated: 0 }, 2048, `# Project Knowledge\n${slice}`)
         }
       }
     } catch {}
@@ -211,7 +250,7 @@ export function renderSnapshotWithStats(
       } catch {}
     }
     if (recentDaily.length) {
-      const fitted = fitSection(recentDaily, caps.recentDaily)
+      const fitted = fitSection(recentDaily, caps.recentDaily, SNAPSHOT_SECTION_MAX_ENTRIES.recentDaily)
       if (fitted.kept.length) take('recentDaily', fitted, caps.recentDaily, `# Recent Daily\n${fitted.kept.join('\n---\n')}`)
     }
   } catch {}

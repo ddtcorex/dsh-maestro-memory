@@ -55,7 +55,7 @@ export type MemoryAction = 'add' | 'list' | 'replace' | 'remove' | 'archive' | '
 
 /** Outcome of repairing one store file (see {@link MaestroMemoryStore.repairFile}). */
 export type RepairFileResult =
-  | { ok: true; changed: boolean; before: number; after: number; split: number; deduped: number; backup: string | null }
+  | { ok: true; changed: boolean; before: number; after: number; split: number; deduped: number; relocated: number; backup: string | null }
   | { ok: false; error: string }
 
 export interface ListOpts {
@@ -261,12 +261,30 @@ export class MaestroMemoryStore {
     return `[${todayStamp()} ${timeStamp()}] ${t}`
   }
 
+  /**
+   * Ensure an entry carries a summary tag in the CANONICAL position.
+   *
+   * The grammar puts `[summary:…]` immediately after the id/timestamp header,
+   * and that is where `parseEntrySummary`, `stripEntrySummary` and the
+   * snapshot's `compactToHead` read it. This method used to append the tag at
+   * the END of the entry instead, which made every auto-summarized entry
+   * invisible to the compactor: `# Recent Daily` (512 B cap) rendered 1,518 B
+   * and the global section 2,303 B because nothing could ever be compacted.
+   *
+   * So: keep a canonical tag as-is, move a trailing one to the header, and only
+   * then fall back to generating one.
+   */
   private ensureAutoSummary(entry: string, target: MemoryTarget): string {
-    if (target === 'daily') return entry
-    if (SUMMARY_TAG_RE.test(entry)) return entry
+    if (parseEntrySummary(entry) !== null) return entry
+    const trailing = /\[summary:([^\]]*)\]\s*$/.exec(entry)
+    if (trailing) {
+      const body = entry.slice(0, trailing.index).trimEnd()
+      const relocated = this.applySummaryTag(body, trailing[1])
+      if (relocated !== body) return relocated
+    }
     const s = autoSummary(entry, 80).replace(/[\n\r\t\]]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120)
     if (!s) return entry
-    return `${entry.trimEnd()} [summary:${s}]`
+    return this.applySummaryTag(entry, s) || entry
   }
 
   // -------------------------------------------------------------------------
@@ -378,7 +396,7 @@ export class MaestroMemoryStore {
     entry: string,
     cwd?: string,
     opts: { branches?: string; summary?: string; date?: string; desensitize?: boolean } = {},
-  ): { ok: true; duplicate?: boolean; id?: string } | { ok: false; error: string } {
+  ): { ok: true; duplicate?: boolean; id?: string; entry?: string } | { ok: false; error: string } {
     try {
       this.assertNotBlocked()
     } catch (e: any) {
@@ -443,7 +461,11 @@ export class MaestroMemoryStore {
     if (res.duplicate) return { ok: true, duplicate: true }
     // Extract generated id if any
     const m = /^\[id:\s*([0-9a-f]{8})\]/i.exec(content)
-    return { ok: true, id: m ? m[1].toLowerCase() : undefined }
+    // `entry` is the FINAL stored text (date prefix, summary tag, feedback line,
+    // id). Callers that must undo this write need it: the tag is inserted after
+    // the header, so the caller's raw content is no longer a substring of what
+    // was stored and a substring-based removal would silently miss.
+    return { ok: true, id: m ? m[1].toLowerCase() : undefined, entry: content }
   }
 
   /** Replace unique entry matching substring */
@@ -697,7 +719,7 @@ export class MaestroMemoryStore {
     }
     try {
       if (!existsSync(filePath)) {
-        return { ok: true, changed: false, before: 0, after: 0, split: 0, deduped: 0, backup: null }
+        return { ok: true, changed: false, before: 0, after: 0, split: 0, deduped: 0, relocated: 0, backup: null }
       }
     } catch (e: any) {
       return { ok: false, error: e?.message ?? String(e) }
@@ -713,6 +735,7 @@ export class MaestroMemoryStore {
           after: plan.after,
           split: plan.split,
           deduped: plan.deduped,
+          relocated: plan.relocated,
           backup: null,
         }
       }
@@ -725,6 +748,7 @@ export class MaestroMemoryStore {
         after: plan.after,
         split: plan.split,
         deduped: plan.deduped,
+        relocated: plan.relocated,
         backup,
       }
     })

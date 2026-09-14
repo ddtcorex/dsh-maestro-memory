@@ -116,8 +116,13 @@ describe('renderSnapshot per-track byte caps', () => {
 
   it('always keeps the newest entry even when it alone exceeds the cap', () => {
     store.add('memory', '[2026-08-10] huge-single-DDD ' + 'x'.repeat(400))
-    const text = renderSnapshot(store, { cwd }, { caps: { memory: 50 } })
+    // Cap 300: the entry (≈415 B) still exceeds it alone and is kept — now as
+    // its compacted head+summary rather than whole, which is why the body text
+    // is no longer rendered. The dedicated ceiling case (an UNTAGGED entry more
+    // than twice its cap) is pinned in tests/snapshot-caps.spec.ts.
+    const text = renderSnapshot(store, { cwd }, { caps: { memory: 300 } })
     expect(text).toContain('huge-single-DDD')
+    expect(text).not.toContain('x'.repeat(200))
   })
 
   it('oversize newest entry carrying [summary:] renders as its compact head only', () => {

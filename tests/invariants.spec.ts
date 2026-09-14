@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { MaestroMemoryStore } from '../src/host/memory/store.ts'
 import { isDuplicate, parseEntries, serializeEntries, isCanonical } from '../src/host/storage/atomic-store.ts'
 import { planRepair } from '../src/host/storage/repair.ts'
+import { parseEntrySummary } from '../src/host/storage/legacy-format.ts'
 import { mergeMemoryEntries } from '../src/host/sync/merge.ts'
 
 const cwd = '/tmp/invariants-project'
@@ -20,8 +21,7 @@ afterEach(async () => {
   await rm(root, { recursive: true, force: true })
 })
 
-describe('isDuplicate — one notion of equality', () => {
-  it('ignores the id prefix', () => {
+describe('isDuplicate — one notion of equality', () => {  it('ignores the id prefix', () => {
     expect(isDuplicate(['[id:deadbeef] same body'], 'same body')).toBe(true)
   })
 
@@ -50,6 +50,21 @@ describe.each([
     if (second.ok) expect(second.duplicate).toBe(true)
     const list = store.list(target as any, targetCwd as any)
     expect(list.filter((e) => e.includes(body))).toHaveLength(1)
+  })
+})
+
+describe('auto-summary position (F10)', () => {
+  it('writes the summary at the header position the compactor can read', () => {
+    store.add('memory', 'body text here', undefined)
+    const entry = store.list('memory')[0]
+    expect(parseEntrySummary(entry)).toBe('body text here')
+    expect(entry).toMatch(/^\[[^\]]+\] \[summary:/)
+  })
+
+  it('relocates a caller-supplied trailing summary instead of leaving it inert', () => {
+    store.add('memory', 'body text here [summary:trailing tag]', undefined)
+    const entry = store.list('memory')[0]
+    expect(parseEntrySummary(entry)).toBe('trailing tag')
   })
 })
 

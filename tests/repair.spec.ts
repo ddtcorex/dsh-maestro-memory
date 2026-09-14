@@ -54,6 +54,31 @@ describe('planRepair — exact duplicates', () => {
   })
 })
 
+describe('planRepair — trailing summary relocation (F10)', () => {
+  it('moves a trailing [summary:…] to the header position the compactor reads', () => {
+    const plan = planRepair('[2026-08-24] alpha body [summary:alpha body]\n')
+    expect(plan.relocated).toBe(1)
+    expect(plan.entries[0]).toBe('[2026-08-24] [summary:alpha body] alpha body')
+  })
+
+  it('leaves a canonical header-position summary untouched', () => {
+    const raw = '[2026-08-24] [summary:already canonical] alpha body\n'
+    const plan = planRepair(raw)
+    expect(plan.relocated).toBe(0)
+    expect(plan.changed).toBe(false)
+  })
+
+  it('is a no-op for an entry with no summary tag', () => {
+    expect(planRepair(`${A}\n`).relocated).toBe(0)
+  })
+
+  it('is idempotent', () => {
+    const once = planRepair('[2026-08-24] alpha body [summary:alpha body]\n')
+    expect(planRepair(once.text).relocated).toBe(0)
+    expect(planRepair(once.text).text).toBe(once.text)
+  })
+})
+
 describe('planRepair — no-ops', () => {
   it('leaves empty and whitespace-only files alone', () => {
     for (const raw of ['', '   \n\n']) {

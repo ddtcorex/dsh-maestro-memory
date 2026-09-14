@@ -24,6 +24,7 @@ export interface RepairDetail {
   after: number
   split: number
   deduped: number
+  relocated: number
 }
 
 export interface RepairReport {
@@ -33,6 +34,7 @@ export interface RepairReport {
   after: number
   split: number
   deduped: number
+  relocated: number
   details: RepairDetail[]
 }
 
@@ -78,7 +80,7 @@ export function collectRepairTargets(root: string): string[] {
 export function repairAllTracks(root: string, opts: { dryRun?: boolean } = {}): RepairReport {
   const store = new MaestroMemoryStore(root)
   const targets = collectRepairTargets(root)
-  const report: RepairReport = { files: 0, changed: 0, before: 0, after: 0, split: 0, deduped: 0, details: [] }
+  const report: RepairReport = { files: 0, changed: 0, before: 0, after: 0, split: 0, deduped: 0, relocated: 0, details: [] }
   for (const path of targets) {
     report.files += 1
     if (opts.dryRun) {
@@ -93,9 +95,10 @@ export function repairAllTracks(root: string, opts: { dryRun?: boolean } = {}): 
       report.after += plan.after
       report.split += plan.split
       report.deduped += plan.deduped
+      report.relocated += plan.relocated
       if (plan.changed) {
         report.changed += 1
-        report.details.push({ path, before: plan.before, after: plan.after, split: plan.split, deduped: plan.deduped })
+        report.details.push({ path, before: plan.before, after: plan.after, split: plan.split, deduped: plan.deduped, relocated: plan.relocated })
       }
       continue
     }
@@ -105,9 +108,10 @@ export function repairAllTracks(root: string, opts: { dryRun?: boolean } = {}): 
     report.after += res.after
     report.split += res.split
     report.deduped += res.deduped
+    report.relocated += res.relocated
     if (res.changed) {
       report.changed += 1
-      report.details.push({ path, before: res.before, after: res.after, split: res.split, deduped: res.deduped })
+      report.details.push({ path, before: res.before, after: res.after, split: res.split, deduped: res.deduped, relocated: res.relocated })
     }
   }
   return report
