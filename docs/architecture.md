@@ -6,7 +6,7 @@
 
 - **Package:** `@ddtcorex/dsh-maestro-memory` (`cordis.patch.yml` id `maestro-memory`)
 - **Install:** `dsh plugin --profile web add link:<workspace-root>/packages/dsh-maestro-memory` (dev) or `github:ddtcorex/dsh-maestro-memory#<sha>` (prod — pin to exact SHA, branch tarballs are stale per `AGENTS.md` pnpm pitfall)
-- **Profile rule:** exactly one owner for each compatibility tool (`memory`/`maestro_todo`/`memory_suggest`); do not keep `dsh-memory-evolve` and `dsh-maestro-memory` in the same profile
+- **Profile rule:** exactly one owner for each compatibility tool (`memory`/`maestro_todo`/`memory_suggest`); do not keep the earlier memory plugin and `dsh-maestro-memory` in the same profile
 
 ## 2. Host — Cordis seams (M0 audit)
 
@@ -25,7 +25,7 @@ Compatibility matrix (M0): no core owner for `memory`/`maestro_todo`/`memory_sug
 
 - **Root:** `resolveMemoryRoot(memoryDir ?? join(homedir(),'.dsh','memories'))`
 - **Files:** `MEMORY.md`/`USER.md` + `*-archive.md` + `SUGGESTIONS.jsonl` + `TODOS-life.md`/`TODOS-work.md` + `daily/YYYY-MM-DD.md` + `daily/YYYY-MM-DD.todo.md` + `projects/<hash>/{MEMORY.md,KEY.md,KEY-archive.md,TODOS.md}` + `.maestro-memory/{schema.json,migration-journal.jsonl,backups/<runId>/,write-block.json,sync/<hash>/}`
-- **Delimiter:** `ENTRY_DELIMITER='\n§\n'` byte-compatible with `dsh-memory-evolve/lib/store.js`; `parseEntries`/`serializeEntries`/`isCanonical` in `storage/{legacy-format,atomic-store}.ts`
+- **Delimiter:** `ENTRY_DELIMITER='\n§\n'` byte-compatible with the earlier plugin's `lib/store.js`; `parseEntries`/`serializeEntries`/`isCanonical` in `storage/{legacy-format,atomic-store}.ts`
 - **Atomic write:** per-directory `.maestro.lock` (stale 10s + `kill(pid,0)` liveness, retry 25ms, timeout 5s, reentrancy guard) → validate canonical → dedupe via `stripEntryId`+`isDuplicate` → temp `.<uuid>.tmp` (`wx`,0o600) → `fsync` → `rename` → `fsync` dir → reread validate
 
 ## 4. Client

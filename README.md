@@ -158,7 +158,7 @@ node scripts/enforce-rules.mjs --check-memory --threshold 90
 
 1. Backup: `node scripts/migrate.mjs --root ~/.dsh/memories --apply`
 2. Verify: `node scripts/migrate.mjs --root ~/.dsh/memories --verify` (must be `ok=true`)
-3. Swap profile: remove `dsh-memory-evolve`, add `dsh-maestro-memory` as `link:` or pinned SHA.
+3. Swap profile: remove the earlier memory plugin, add `dsh-maestro-memory` as `link:` or pinned SHA.
 4. Restart `dsh web` at user-approved window, then live-read each track.
 
 Rollback: `rollback(root, runId)` restores byte-identical files from `backups/<runId>/`.

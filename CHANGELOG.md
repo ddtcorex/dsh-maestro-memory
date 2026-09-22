@@ -4,6 +4,18 @@ All notable changes to this project are documented in this file. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2026-09-22
+
+### Fixed
+
+- **The Memory view fields keep the 16px floor on iOS** — taps no longer
+  magnify the visual viewport (#58).
+
+### Changed
+
+- Bump the `@deepseek-ai/*` pins to `0.1.7-alpha.1` (#61) and move to
+  vitest 3 so the suite loads the DSH 0.1.6 peers (#60).
+
 ## [2.1.0] - 2026-09-14
 
 ### Added
@@ -225,7 +237,7 @@ session after restart.
 ## [1.0.0] - 2026-08-24
 
 Initial release of `@ddtcorex/dsh-maestro-memory`, a from-scratch TypeScript
-rebrand of `dsh-memory-evolve` that runs as a DeepSeek Harness plugin and
+rebrand of an earlier memory plugin that runs as a DeepSeek Harness plugin and
 preserves the existing `~/.dsh/memories` files in place.
 
 ### Added
@@ -278,7 +290,8 @@ preserves the existing `~/.dsh/memories` files in place.
 
 ### Removed
 
-- All legacy `dsh-memory-evolve` features not carried into the rebrand: COI /
+- All legacy features of the earlier memory plugin not carried into the
+  rebrand: COI /
   broadcast, advisor, notify/`de_channel_send`, search, prompt library, model
   registry, bookmarks/mermaid/canvas, and the old `/memory-evolve` HTTP server.
 
