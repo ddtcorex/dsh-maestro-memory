@@ -38,8 +38,7 @@ function violations(): Violation[] {
     if (/^\d/.test(range.trim())) reasons.push('exact pin')
     if (!/<\s*0\.\d/.test(range)) reasons.push('missing ceiling')
     else if (!/0\.2\.0-0/.test(range)) reasons.push('ceiling lacks -0 suffix')
-    const earlyFloor = /0\.1\.0-rc\.6/.test(range) || /0\.1\.1-rc\.0/.test(range)
-      || /0\.1\.0\b/.test(range) || /0\.1\.1\b/.test(range)
+    const earlyFloor = /(?:>=|\^|~)?\s*0\.1\.\d/.test(range)
     if (!earlyFloor) reasons.push('floor too late')
     if (reasons.length > 0) found.push({ name, range, reasons })
   }
