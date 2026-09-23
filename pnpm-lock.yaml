@@ -15,16 +15,16 @@ importers:
         specifier: ~4.0.4
         version: 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.6)(@deepseek-ai/cordis-plugin-loader@1.0.2)
       '@deepseek-ai/dsh-client-locale':
-        specifier: ^0.1.0-rc.6 || >=0.1.1-rc.0 <0.2.0
+        specifier: ^0.1.0-rc.6 || >=0.1.1-rc.0 <0.2.0-0
         version: 0.1.1-rc.2(52e649b0b6c6083491df6a7f228ab895)
       '@deepseek-ai/dsh-client-runtime':
-        specifier: ^0.1.0-rc.6 || >=0.1.1-rc.0 <0.2.0
+        specifier: ^0.1.0-rc.6 || >=0.1.1-rc.0 <0.2.0-0
         version: 0.1.1-rc.2(6c8a622bdcfc1ac3674d0bf744b92eca)
       '@deepseek-ai/dsh-client-ui-conversation':
-        specifier: ^0.1.0-rc.6 || >=0.1.1-rc.0 <0.2.0
+        specifier: ^0.1.0-rc.6 || >=0.1.1-rc.0 <0.2.0-0
         version: 0.1.1-rc.2(42629a0dfd906c735f8e92a0fccea1fe)
       '@deepseek-ai/dsh-client-ui-slots':
-        specifier: ^0.1.0-rc.6 || >=0.1.1-rc.0 <0.2.0
+        specifier: ^0.1.0-rc.6 || >=0.1.1-rc.0 <0.2.0-0
         version: 0.1.1-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.1-rc.2(@deepseek-ai/cordis@4.0.4))
       react:
         specifier: ^18.2.0
