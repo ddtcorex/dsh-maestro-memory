@@ -22,7 +22,6 @@ function fakeCtx(memoryDir: string) {
   const tools: any[] = []
   const rpcHandlers = new Map<string, any>()
   const rpcTransportHandlers = new Map<string, any>()
-  const rpcOptions = new Map<string, any>()
   const ctx: any = {
     tools: {
       register: (t: any) => {
@@ -35,10 +34,12 @@ function fakeCtx(memoryDir: string) {
     },
     connection: {
       rpc: {
-        handle: (channel: string, handler: any, options: any) => {
+        // Mirrors the real HostConnectionRpc.handle(channel, handler) — two parameters.
+        // Loopback confinement is a transport property (ctx.connection.isLoopback),
+        // never a per-channel registration option, so the mock must not accept one.
+        handle: (channel: string, handler: any) => {
           rpcTransportHandlers.set(channel, handler)
           rpcHandlers.set(channel, async (endpoint: string, payload: any) => (await handler(endpoint, payload, new AbortController().signal)).value)
-          rpcOptions.set(channel, options)
           return () => {}
         },
         call: async (channel: string, endpoint: string, payload: any) => {
@@ -54,7 +55,7 @@ function fakeCtx(memoryDir: string) {
     },
     on: () => () => {},
     get: (name: string) => (name === 'connection' ? ctx.connection : undefined),
-    state: { tools, rpcHandlers, rpcTransportHandlers, rpcOptions },
+    state: { tools, rpcHandlers, rpcTransportHandlers },
   }
   return ctx
 }
@@ -80,11 +81,11 @@ describe('M2-PR-B gated memory_suggest and explicit RPC', () => {
     }
   })
 
-  it('registers its RPC endpoint for loopback and wraps legacy responses', async () => {
+  it('registers its RPC endpoint and wraps legacy responses', async () => {
     const ctx = fakeCtx(root)
     apply(ctx, { memoryDir: root })
 
-    expect(ctx.state.rpcOptions.get('/dsh-maestro-memory')).toEqual({ authority: 'loopback' })
+    expect(ctx.state.rpcTransportHandlers.has('/dsh-maestro-memory')).toBe(true)
     const handler = ctx.state.rpcTransportHandlers.get('/dsh-maestro-memory')
     await expect(handler('queue.list', {})).resolves.toEqual({
       ok: true,
