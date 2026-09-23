@@ -799,13 +799,16 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
     // ctx.connection may be undefined in tests; guard
     const conn = (ctx as any).connection ?? (ctx.get && ctx.get('connection'))
     if (!conn?.rpc?.handle) return () => {}
-    const dispose = conn.rpc.handle(channel, handler, { authority: 'loopback' })
+    const dispose = conn.rpc.handle(channel, handler)
     return () => {
       if (typeof dispose === 'function') dispose()
     }
   }, 'maestro-memory: rpc')
 
-  // Health dashboard handler (Task6) — loopback only, returns coverage + daily counts
+  // Health dashboard handler (Task6) — returns coverage + daily counts. Confinement
+  // comes from the transport: this channel is only reachable over the authenticated
+  // host connection, and loopback is a property of the connection
+  // (ctx.connection.isLoopback), not of an individual channel registration.
   ctx.effect(() => {
     const conn2 = (ctx as any).connection ?? (ctx.get && ctx.get('connection'))
     if (!conn2?.rpc?.handle) return () => {}
@@ -857,11 +860,12 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
       if (res.ok) return { ok: true as const, value: res.value }
       return { ok: false as const, error: { message: res.error } }
     }
-    const dispose2 = conn2.rpc.handle(healthChannel, h, { authority: 'loopback' })
+    const dispose2 = conn2.rpc.handle(healthChannel, h)
     return () => { if (typeof dispose2 === 'function') dispose2() }
   }, 'maestro-memory: health')
 
-  // Propose handler for Health → queue (Task4) — loopback only
+  // Propose handler for Health → queue (Task4). Confinement comes from the transport,
+  // as above — not from a per-channel option.
   ctx.effect(() => {
     const conn3 = (ctx as any).connection ?? (ctx.get && ctx.get('connection'))
     if (!conn3?.rpc?.handle) return () => {}
@@ -892,7 +896,7 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
       if (r.ok) return { ok: true as const, value: r.value }
       return { ok: false as const, error: { message: r.error } }
     }
-    const d3 = conn3.rpc.handle('/dsh-maestro-memory-propose', wrapped, { authority: 'loopback' })
+    const d3 = conn3.rpc.handle('/dsh-maestro-memory-propose', wrapped)
     return () => { if (typeof d3 === 'function') d3() }
   }, 'maestro-memory: propose')
 }

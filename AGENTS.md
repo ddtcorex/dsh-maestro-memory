@@ -12,7 +12,7 @@ Part of the Maestro Harness suite (installed as a DSH plugin). Originally forked
 
 ## Layout
 
-- `src/host/index.ts` — host `apply()`: registers the `memory` + `memory_suggest` + `maestro_todo` tools, the `memory:snapshot` and `memory:task-systems` systemPrompt contexts (order `snapshotOrder ?? 500`), and the `/dsh-maestro-memory` RPC channel (loopback authority).
+- `src/host/index.ts` — host `apply()`: registers the `memory` + `memory_suggest` + `maestro_todo` tools, the `memory:snapshot` and `memory:task-systems` systemPrompt contexts (order `snapshotOrder ?? 500`), and the `/dsh-maestro-memory` RPC channel.
 - `src/host/memory/store.ts` — `MaestroMemoryStore` over five tracks (`memory`/`user`/`project`/`key`/`daily`): add/list/replace/remove/archive/expand + `snapshot`.
 - `src/host/todo/store.ts` — `TodoStore` (four tracks, quadrant/due/status, smart view).
 - `src/host/prompt/snapshot.ts` — `renderSnapshot(store, ctx, opts)`: bounded snapshot (USER + MEMORY + KEY + Project Context auto-recall + bounded Recent Daily + REFERENCE slice) with session header, the end-of-turn discipline note, the optional write-backlog alert, and the subagent cadence variant.
@@ -56,7 +56,8 @@ pnpm build    # tsc host + client && node scripts/build-client.mjs  -> lib/
 - **Bounded snapshot** — sections are byte-capped per {@link SNAPSHOT_SECTION_CAPS} and the rendered text collapses brace runs (DSH prompt interpolation fails a turn on a malformed `{{name}}`). For human-facing sessions the end-of-turn discipline note is preserved **verbatim** and is always the last part; the write-backlog alert renders immediately *before* it and never displaces it.
 - **Subagent sessions** (`session.header.origin === 'subagent'`) get a per-achievement cadence instead of the per-turn duty and never the backlog alert. Changing the human-facing note must not change the subagent variant, and vice versa.
 - **Write watchdog is opt-in** (`config.writeGuard`, default off) and in-memory only: it guards per-turn drift inside one process, not durable state. A turn counts only when it is human-origin AND dispatched at least one tool call (`readTurnFacts`) — pure question/answer turns must never accrue debt. A write discharges the duty only when it actually recorded something (`daily`/`project`, not a duplicate).
-- **Gated writes** — the model writes via `memory_suggest` (queue → user approve) and `maestro_todo`; `memory add` is the explicit path. RPC endpoints are `loopback` authority.
+- **Gated writes** — the model writes via `memory_suggest` (queue → user approve) and `maestro_todo`; `memory add` is the explicit path.
+- **RPC confinement is a transport property, not a registration option.** `ctx.connection.rpc.handle(channel, handler)` takes exactly two parameters — there is no `authority` argument (verified against DSH 0.1.7-rc.1: `HostConnectionRpc.handle`, `packages/client/connection/src/rpc.ts`). Loopback is reported by `ctx.connection.isLoopback` on the connection itself. Do not pass an options object: it is silently ignored, and writing tests against a mock that accepts one hides the fact.
 - Keep the host/client split; client bundle injects `['@deepseek-ai/dsh-client-runtime','@deepseek-ai/dsh-client-ui-slots']`.
 - Strict TDD with vitest; every deterministic operation is a tool, LLM is reasoning-only.
 
