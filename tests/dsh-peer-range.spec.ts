@@ -20,7 +20,7 @@ const manifest = JSON.parse(readFileSync(resolve(here, '../package.json'), 'utf8
 }
 
 /** The one range every dsh peer must carry. Keep in sync with the workspace AGENTS.md rule. */
-const NORMALIZED = '^0.1.0-rc.6 || >=0.1.1-rc.0 <0.2.0-0'
+const NORMALIZED = '^0.1.0-rc.6 || >=0.1.1-rc.0 <0.3.0-0'
 const FORBIDDEN_PEER_PREFIX = '@deepseek-ai/dsh'
 
 interface Violation { name: string; range: string; reasons: string[] }
@@ -37,7 +37,7 @@ function violations(): Violation[] {
     const reasons: string[] = []
     if (/^\d/.test(range.trim())) reasons.push('exact pin')
     if (!/<\s*0\.\d/.test(range)) reasons.push('missing ceiling')
-    else if (!/0\.2\.0-0/.test(range)) reasons.push('ceiling lacks -0 suffix')
+    else if (!/0\.3\.0-0/.test(range)) reasons.push('ceiling lacks -0 suffix')
     const earlyFloor = /(?:>=|\^|~)?\s*0\.1\.\d/.test(range)
     if (!earlyFloor) reasons.push('floor too late')
     if (reasons.length > 0) found.push({ name, range, reasons })
@@ -64,7 +64,7 @@ describe('dsh peer ranges', () => {
   })
 
   it('flags a ceiling that lacks the -0 suffix', () => {
-    expect(/0\.2\.0-0/.test('^0.1.0-rc.6 || >=0.1.1-rc.0 <0.2.0')).toBe(false)
-    expect(/0\.2\.0-0/.test(NORMALIZED)).toBe(true)
+    expect(/0\.3\.0-0/.test('^0.1.0-rc.6 || >=0.1.1-rc.0 <0.3.0')).toBe(false)
+    expect(/0\.3\.0-0/.test(NORMALIZED)).toBe(true)
   })
 })
