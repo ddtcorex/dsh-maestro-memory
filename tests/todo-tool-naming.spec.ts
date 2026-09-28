@@ -12,6 +12,12 @@ import { apply } from '../src/host/index.ts'
 // now `maestro_todo`, its description leads with what it is and names the tool
 // it must not be confused with, and a routing line names both systems in every
 // session's prompt.
+//
+// Update 2026-09-28 (human): the Memory view tab is labelled `Todo`, not
+// `Todo store`. The disambiguation burden moved to the surfaces that address the
+// model (the tool description + the `memory:task-systems` routing line, both
+// asserted below); the human-facing tab keeps the short noun. The test therefore
+// pins the exact label instead of demanding the word "store" in it.
 
 let root: string
 
@@ -86,12 +92,12 @@ describe('the durable todo tool is named apart from the harness task list', () =
     }
   })
 
-  it('labels the Memory view tab as the durable store, not plain "Todos"', () => {
+  it('labels the Memory view tab `Todo`, never the plain "Todos" the harness list uses', () => {
     const client = readFileSync(
       fileURLToPath(new URL('../src/client/index.tsx', import.meta.url)),
       'utf8',
     )
-    expect(client).not.toMatch(/\{id:'todos',\s*label:'Todos'/)
-    expect(client).toMatch(/id:'todos',\s*label:'[^']*store[^']*'/)
+    expect(client).toMatch(/id:'todos',\s*label:'Todo'/)
+    expect(client).not.toMatch(/id:'todos',\s*label:'Todos'/)
   })
 })
