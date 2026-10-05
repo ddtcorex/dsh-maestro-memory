@@ -5,12 +5,12 @@ Durable memory and todos for DeepSeek Harness (DSH) — preserves `~/.dsh/memori
 > Give the AI cross-session durable memory and todos — the more you use it, the more it understands you.
 
 - **Package:** `@ddtcorex/dsh-maestro-memory` (`cordis.patch.yml` id `maestro-memory`)
-- **Version:** `2.0.0` · **Changelog:** `CHANGELOG.md`
+- **Version:** see `package.json` · **Changelog:** `CHANGELOG.md`
 
 ## Requirements
 
-- Node.js 22+, pnpm 11+
-- DSH `deepseek-harness` master
+- Node.js `^22.19.0 || >=24.0.0`, pnpm 11+ (`packageManager` in `package.json`)
+- A DSH release inside the `@deepseek-ai/dsh-client-*` peer range declared in `package.json`
 
 ## Install
 
@@ -105,7 +105,7 @@ The rendered snapshot collapses brace runs of two or more to a single brace: DSH
 
 ## UI & RPC
 
-One `conversation.view` slot (`maestro-memory`, order 40) with tabs **Memory / Review / Todos / Skills / Health**. Health shows `coverage`, `daily last 7d`, `longest` + 5-dim score `S/R/J/C/Safety` (composite `min*0.4+mean*0.6`).
+One `conversation.view` slot (`maestro-memory`, order 40) with tabs **Memory / Queue / Todo / Skills / Health**. Health shows `coverage`, `daily last 7d`, `longest` + 5-dim score `S/R/J/C/Safety` (composite `min*0.4+mean*0.6`).
 
 The **Memory** tab lists each track read-only and carries a manual add composer:
 pick a track, type an entry, press Add. It posts `memory.mutate` with
@@ -149,10 +149,10 @@ existing machine pick up a new repair rule exactly once.)
 
 ## Maintenance
 
-```sh
-node scripts/maestro-memory-remediate.mjs --apply --threshold-days 14
-node scripts/enforce-rules.mjs --check-memory --threshold 90
-```
+Maintenance runs through the `memory.repair` and `memory.maintenance` RPC endpoints
+described under UI & RPC above (preview-first, `confirm: true` to write). There are
+no standalone maintenance scripts; `scripts/` only holds the build, migration and
+sync-worker helpers.
 
 ## Cutover
 
