@@ -4,7 +4,7 @@
 
 ## Purpose
 
-Durable memory + todos + bounded system-prompt snapshot plugin for the DeepSeek Harness (DSH). One Cordis row (`id: maestro-memory`) with a host half (Node) and a client half (browser Memory view / sync UI).
+Durable memory + todos + bounded system-prompt snapshot plugin for the DeepSeek Harness (DSH). One Cordis row (`id: maestro-memory`) with a host half (Node) and a client half (browser Memory view: Memory, Queue, Todo, Skills and Health tabs; sync is host and RPC only, it has no client tab).
 
 Names by boundary: npm package = `@ddtcorex/dsh-maestro-memory`; Cordis patch row id = `maestro-memory`.
 
@@ -19,10 +19,10 @@ Part of the Maestro Harness suite (installed as a DSH plugin). Originally forked
 - `src/host/memory/write-guard.ts` — per-turn write watchdog: `createWriteGapCounter(ctx, isEnabled)` counts consecutive human turns that did work but wrote no guarded track, on `agent/turn-stopping`; `readTurnFacts(agent)` reads turn origin + tool activity from the session log; `isGuardedTrack(target)` is the `daily`/`project` predicate.
 - `src/host/storage/` — `layout.ts` (paths), `atomic-store.ts` (append/read/write with directory lock), `legacy-format.ts` (entry parsing, summary/branch tags).
 - `src/host/sync/` — git-backed memory sync (`SyncService`, `RealGitAdapter`, merge/conflict resolution).
-- `src/host/migration/` — 6-phase staged replacement (`inspect`/`backup`/`adopt`/`verify`, read-only by default, `--apply` to mutate).
+- `src/host/migration/` — staged replacement service (`inspect`/`dryRun`/`run`/`verify`/`rollback`, read-only by default, `--apply` to mutate).
 - `src/host/review/queue.ts` — gated `memory_suggest` confirmation queue.
 - `src/host/skills-browser.ts` — read-only skills list (M6).
-- `src/client/index.tsx` — browser half (Memory view, Sync tab, Review queue UI).
+- `src/client/index.tsx` — browser half (Memory view with Memory, Queue, Todo, Skills and Health tabs; no Sync tab).
 - `lib/` — gitignored build output. Generated; do not hand-edit, never commit.
 - `scripts/build-client.mjs` — client bundle builder.
 - `tests/*.spec.ts` — vitest suites.
@@ -58,7 +58,7 @@ pnpm build    # tsc host + client && node scripts/build-client.mjs  -> lib/
 - **Write watchdog is opt-in** (`config.writeGuard`, default off) and in-memory only: it guards per-turn drift inside one process, not durable state. A turn counts only when it is human-origin AND dispatched at least one tool call (`readTurnFacts`) — pure question/answer turns must never accrue debt. A write discharges the duty only when it actually recorded something (`daily`/`project`, not a duplicate).
 - **Gated writes** — the model writes via `memory_suggest` (queue → user approve) and `maestro_todo`; `memory add` is the explicit path.
 - **RPC confinement is a transport property, not a registration option.** `ctx.connection.rpc.handle(channel, handler)` takes exactly two parameters — there is no `authority` argument (verified against DSH 0.1.7-rc.1: `HostConnectionRpc.handle`, `packages/client/connection/src/rpc.ts`). Loopback is reported by `ctx.connection.isLoopback` on the connection itself. Do not pass an options object: it is silently ignored, and writing tests against a mock that accepts one hides the fact.
-- Keep the host/client split; client bundle injects `['@deepseek-ai/dsh-client-runtime','@deepseek-ai/dsh-client-ui-slots']`.
+- Keep the host/client split; client bundle injects `['@deepseek-ai/dsh-client-ui-slots']` (`dsh.client.inject` in `package.json`).
 - Strict TDD with vitest; every deterministic operation is a tool, LLM is reasoning-only.
 
 ## Validation
@@ -70,6 +70,6 @@ pnpm build    # tsc host + client && node scripts/build-client.mjs  -> lib/
 ## See Also
 
 - Local architecture audit: `docs/architecture.md`
-- The full spec (`dsh-maestro-memory.md`) and sync design live in the Maestro Harness coordination workspace.
+- The full spec (`<workspace-root>/docs/specs/dsh-maestro-memory.md`) and the sync design (`<workspace-root>/docs/sync-design.md`) live in the Maestro Harness coordination workspace.
 
 - **Always request approval before merge or release:** never merge a PR/MR or publish a release (`git tag`/`pnpm publish`/`gh release`) without an explicit human approval — request review (`gh pr ready` / `gh pr request-review` / ask in chat) and wait for `APPROVED`.
