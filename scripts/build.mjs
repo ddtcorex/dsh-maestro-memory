@@ -1,5 +1,5 @@
 /**
- * Build the dsh-memory-evolve client bundle.
+ * Build the dsh-maestro-memory client bundle.
  *
  * Produces lib/client.js in the exact wire format the DSH web shell expects:
  * a CJS factory handed to window.__ModuleLoader__.load({ id, factory }), with
