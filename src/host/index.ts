@@ -793,7 +793,7 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
     const conn2 = (ctx as any).connection ?? (ctx.get && ctx.get('connection'))
     if (!conn2?.rpc?.handle) return () => {}
     const healthChannel = '/dsh-maestro-memory-health'
-    const healthHandler = async (endpoint: string, payload: any) => {
+    const healthHandler = async (_endpoint: string, payload: any) => {
       try {
         // Cost is a property of the renderer, not of any one project, so it is
         // reported on both paths — including when cwd is missing.
@@ -849,7 +849,7 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
   ctx.effect(() => {
     const conn3 = (ctx as any).connection ?? (ctx.get && ctx.get('connection'))
     if (!conn3?.rpc?.handle) return () => {}
-    const proposeHandler = async (endpoint: string, payload: any) => {
+    const proposeHandler = async (_endpoint: string, payload: any) => {
       try {
         const content = String(payload?.content ?? '').trim()
         const reason = String(payload?.reason ?? 'promote from Health longest').trim()
