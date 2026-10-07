@@ -16,6 +16,9 @@ All notable changes to this project are documented in this file. Format follows
 - **The `write-block.json` write guard.** Nothing writes that flag any more,
   so the memory store, todo store and sync service no longer check it, the
   `status` RPC no longer reports `blocked`, and `isWriteBlocked` is gone.
+- **Unused layout helpers.** `journalPath`, `backupsDir`,
+  `backupManifestPath`, `backupFilesDirPath`, `schemaPath` and
+  `allMetadataPaths` had no callers left after the migration removal.
 
 ## [2.2.1] - 2026-10-07
 

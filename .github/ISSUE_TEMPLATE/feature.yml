@@ -14,7 +14,7 @@ body:
       label: Area
       options:
         - Memory / todo storage
-        - Sync / migration
+        - Sync
         - Cordis plugin (host / client / DSH preset)
         - Snapshot / prompt injection
         - Documentation / DX

@@ -24,7 +24,7 @@ Compatibility matrix (M0): no core owner for `memory`/`maestro_todo`/`memory_sug
 ## 3. Storage & atomicity
 
 - **Root:** `resolveMemoryRoot(memoryDir ?? join(homedir(),'.dsh','memories'))`
-- **Files:** `MEMORY.md`/`USER.md` + `*-archive.md` + `SUGGESTIONS.jsonl` + `TODOS-life.md`/`TODOS-work.md` + `daily/YYYY-MM-DD.md` + `daily/YYYY-MM-DD.todo.md` + `projects/<hash>/{MEMORY.md,KEY.md,KEY-archive.md,TODOS.md}` + `.maestro-memory/{schema.json,migration-journal.jsonl,backups/<runId>/,write-block.json,sync/<hash>/}`
+- **Files:** `MEMORY.md`/`USER.md` + `*-archive.md` + `SUGGESTIONS.jsonl` + `TODOS-life.md`/`TODOS-work.md` + `daily/YYYY-MM-DD.md` + `daily/YYYY-MM-DD.todo.md` + `projects/<hash>/{MEMORY.md,KEY.md,KEY-archive.md,TODOS.md}` + `.maestro-memory/{sync/<hash>/,delimiter-repaired-v3}`
 - **Delimiter:** `ENTRY_DELIMITER='\n§\n'` byte-compatible with the earlier plugin's `lib/store.js`; `parseEntries`/`serializeEntries`/`isCanonical` in `storage/{legacy-format,atomic-store}.ts`
 - **Atomic write:** per-directory `.maestro.lock` (stale 10s + `kill(pid,0)` liveness, retry 25ms, timeout 5s, reentrancy guard) → validate canonical → dedupe via `stripEntryId`+`isDuplicate` → temp `.<uuid>.tmp` (`wx`,0o600) → `fsync` → `rename` → `fsync` dir → reread validate
 
