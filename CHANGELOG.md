@@ -4,6 +4,13 @@ All notable changes to this project are documented in this file. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.1] - 2026-10-07
+
+### Fixed
+
+- **RPC rows activate on DSH 0.2.x.** The bundle patch declares `webServer` on the `connection` entry, so rows that call `rpc.handle` no longer fail with `cannot get property "webServer" without inject` and their channels no longer answer 405.
+- **Peer range** now ends at `<0.3.0-0`, so memory is no longer skipped on dsh 0.2.x (published 2.2.0 declared `<0.2.0`).
+
 ## [2.2.0] - 2026-09-22
 
 ### Fixed
