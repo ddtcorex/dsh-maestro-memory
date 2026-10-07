@@ -192,13 +192,3 @@ export function allMetadataPaths(root: string, runId?: string): {
     backupFilesDir: runId ? backupFilesDirPath(root, runId) : undefined,
   }
 }
-
-// Aliases for spec compatibility (different naming conventions)
-export const resolveMemoryFiles = allMemoryPaths
-export const resolveTodoFiles = allTodoPaths
-export const resolveArchiveFiles = allArchivePaths
-export const resolveMetadataFiles = allMetadataPaths
-export const getMemoryPaths = allMemoryPaths
-export const getTodoPaths = allTodoPaths
-export const getArchivePaths = allArchivePaths
-export const getMetadataPaths = allMetadataPaths

@@ -5,6 +5,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import { existsSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { MaestroMemoryStore } from './memory/store.ts'
+import type { MemoryAction } from './memory/store.ts'
 import { repairAllTracks } from './memory/repair-runner.ts'
 import { planArchive, DEFAULT_ARCHIVE_POLICY } from './memory/maintenance.ts'
 import { applyBatch } from './memory/batch.ts'
@@ -87,7 +88,7 @@ export function isMemoryConcurrencySafe(args: any): boolean {
 
 // Extended unions for memory tool (M2-PR-A + M2-PR-B queue)
 export type MemoryTarget = 'memory' | 'user' | 'project' | 'key' | 'daily'
-export type MemoryAction = 'add' | 'list' | 'replace' | 'remove' | 'archive' | 'expand'
+export type { MemoryAction }
 
 const CONTENT_OUTPUT = {
   schema: {
