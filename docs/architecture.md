@@ -10,7 +10,7 @@
 
 ## 2. Host — Cordis seams (M0 audit)
 
-All registrations are via `ctx.effect(() => disposer, label)` so `stop`/`update`/`undefine` cleans up. No standalone HTTP server: the RPC channels register a `webServer` route (the patch row declares `webServer` in its `inject`).
+All registrations are via `ctx.effect(() => disposer, label)` so `stop`/`update`/`undefine` cleans up. No standalone HTTP server: the RPC channels register a `webServer` route (the patch declares `webServer` on the `connection` entry; a row-level `inject` alone does not reach it on DSH 0.2.x).
 
 | Seam | How we use it | Signature (as shipped) | Notes |
 |---|---|---|---|
