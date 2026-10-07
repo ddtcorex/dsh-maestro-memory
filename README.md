@@ -151,8 +151,8 @@ existing machine pick up a new repair rule exactly once.)
 
 Maintenance runs through the `memory.repair` and `memory.maintenance` RPC endpoints
 described under UI & RPC above (preview-first, `confirm: true` to write). There are
-no standalone maintenance scripts; `scripts/` only holds the build, migration and
-sync-worker helpers.
+no standalone maintenance scripts; `scripts/` only holds the build and migration
+helpers.
 
 ## Cutover
 
