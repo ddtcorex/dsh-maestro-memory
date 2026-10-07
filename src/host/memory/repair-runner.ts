@@ -3,9 +3,9 @@
  * track file in one pass.
  *
  * The enumeration is deliberately disk-driven, not a hard-coded key list: the
- * corruption this repairs (glued and duplicated entries) was written by a
- * migration pass, so the repair must cover whatever files that pass could have
- * touched — including projects nobody remembers creating.
+ * corruption this repairs (glued and duplicated entries) can sit in any
+ * track file, so the repair must cover whatever files exist on disk,
+ * including projects nobody remembers creating.
  *
  * `dryRun` shares the pure planner instead of `store.repairFile` so a preview
  * never takes the write lock and never mints a backup.

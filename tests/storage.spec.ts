@@ -23,15 +23,9 @@ import {
   projectKeyArchivePath,
   todoArchivePath,
   maestroMetaDir,
-  schemaPath,
-  journalPath,
-  backupsDir,
-  backupManifestPath,
-  backupFilesDirPath,
   allMemoryPaths,
   allTodoPaths,
   allArchivePaths,
-  allMetadataPaths,
   projectArchivePath,
   projectArchiveDir,
 } from '../src/host/storage/layout.ts'
@@ -151,16 +145,6 @@ describe('layout', () => {
   it('resolves metadata', () => {
     const root = '/mem'
     expect(maestroMetaDir(root)).toBe(join(root, '.maestro-memory'))
-    expect(schemaPath(root)).toBe(join(root, '.maestro-memory', 'schema.json'))
-    expect(journalPath(root)).toBe(join(root, '.maestro-memory', 'migration-journal.jsonl'))
-    expect(backupsDir(root)).toBe(join(root, '.maestro-memory', 'backups'))
-    const runId = '20260824T120000Z'
-    expect(backupManifestPath(root, runId)).toBe(join(root, '.maestro-memory', 'backups', runId, 'manifest.json'))
-    expect(backupFilesDirPath(root, runId)).toBe(join(root, '.maestro-memory', 'backups', runId, 'files'))
-    const meta = allMetadataPaths(root, runId)
-    expect(meta.schema).toBe(schemaPath(root))
-    expect(meta.journal).toBe(journalPath(root))
-    expect(meta.backupManifest).toBe(backupManifestPath(root, runId))
   })
   it('daily dir', () => {
     expect(dailyDir('/mem')).toBe(join('/mem', 'daily'))

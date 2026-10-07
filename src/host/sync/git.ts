@@ -8,7 +8,6 @@ import { spawnSync } from 'node:child_process'
 import { mkdtempSync, rmSync, readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { randomUUID } from 'node:crypto'
 
 export interface GitAdapter {
   /** Fetch remote branch, return ok/error */

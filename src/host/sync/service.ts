@@ -2,19 +2,19 @@
  * sync/service.ts — enable/disable/status/fetch/push/pull/resolve
  * Disabled => zero Git activity (no spawn).
  */
-import { existsSync, readFileSync, writeFileSync, mkdirSync, appendFileSync, rmSync, readdirSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
+import { dirname } from 'node:path'
 import { randomBytes } from 'node:crypto'
-import { resolveMemoryRoot, maestroMetaDir } from '../storage/layout.ts'
+import { resolveMemoryRoot } from '../storage/layout.ts'
 import { projectHash, projectKeyPath, projectMemoryPath, projectKeyArchivePath, projectTodoPath } from '../storage/layout.ts'
 import { parseEntries, serializeEntries } from '../storage/atomic-store.ts'
 import { parseTodoEntry, TODO_HEADER, ENTRY_DELIMITER } from '../storage/legacy-format.ts'
 import { readEntriesSync, writeEntriesAtomicSync } from '../storage/atomic-store.ts'
-import { syncBranchName, syncConflictsPath, syncDir } from './layout.ts'
+import { syncBranchName, syncConflictsPath } from './layout.ts'
 import { readConfig, writeConfig, clearConfig, readMeta, writeMeta, baseIdsFromMeta, SyncConfig, SyncMeta } from './config.ts'
-import { mergeMemoryEntries, mergeTodoEntries, snapshotIds, mapById } from './merge.ts'
+import { mergeMemoryEntries, mergeTodoEntries } from './merge.ts'
 import type { GitAdapter } from './git.ts'
-import { MockGitAdapter, RealGitAdapter } from './git.ts'
+import { MockGitAdapter } from './git.ts'
 
 const TRACK_FILES: Record<string, (root: string, cwd: string) => string> = {
   KEY: (root, cwd) => projectKeyPath(root, cwd),
@@ -58,15 +58,6 @@ function readTodoTrackRaw(root: string, cwd: string): string[] {
   return body.split(ENTRY_DELIMITER).map((s) => s.trim()).filter(Boolean)
 }
 
-function todoIds(entries: string[]): Set<string> {
-  const s = new Set<string>()
-  for (const e of entries) {
-    const parsed = parseTodoEntry(e)
-    if (parsed?.id) s.add(parsed.id.toLowerCase())
-  }
-  return s
-}
-
 function extractId(entry: string): string | null {
   const m = /^\[id:\s*([0-9a-f]{8})\]\s*/i.exec(entry)
   if (m) return m[1].toLowerCase()
@@ -74,17 +65,6 @@ function extractId(entry: string): string | null {
   const pm = parseTodoEntry(entry)
   if (pm?.id) return pm.id.toLowerCase()
   return null
-}
-
-function isWriteBlockedSync(root: string): boolean {
-  try {
-    const p = join(maestroMetaDir(root), 'write-block.json')
-    if (!existsSync(p)) return false
-    const data = JSON.parse(readFileSync(p, 'utf8'))
-    return data.blocked === true
-  } catch {
-    return false
-  }
 }
 
 export class SyncService {
@@ -175,13 +155,6 @@ export class SyncService {
     writeFileSync(p, lines ? lines + '\n' : '', 'utf8')
   }
 
-  private appendConflict(cwd: string, rec: any): void {
-    const hash = this.hashFor(cwd)
-    const p = syncConflictsPath(this.root(), hash)
-    mkdirSync(dirname(p), { recursive: true })
-    appendFileSync(p, JSON.stringify(rec) + '\n', 'utf8')
-  }
-
   // -------------------------------------------------------------------------
   // internal helpers: collect local files as remote map
   // -------------------------------------------------------------------------
@@ -199,38 +172,12 @@ export class SyncService {
     return out
   }
 
-  private writeLocalFiles(cwd: string, files: Record<string, string>): void {
-    const root = this.root()
-    if (files['KEY.md'] !== undefined) {
-      const entries = parseEntries(files['KEY.md'])
-      writeMemoryTrack(root, cwd, 'KEY', entries)
-    }
-    if (files['MEMORY.md'] !== undefined) {
-      const entries = parseEntries(files['MEMORY.md'])
-      writeMemoryTrack(root, cwd, 'MEMORY', entries)
-    }
-    if (files['KEY-archive.md'] !== undefined) {
-      const entries = parseEntries(files['KEY-archive.md'])
-      writeMemoryTrack(root, cwd, 'KEY-archive', entries)
-    }
-    if (files['TODOS.md'] !== undefined) {
-      const text = files['TODOS.md']
-      const body = text.replace(/^<!--[\s\S]*?-->\s*/, '').replace(/^\s*§\s*\n?/, '').trim()
-      const entries = body ? body.split(ENTRY_DELIMITER).map((s) => s.trim()).filter(Boolean) : []
-      const p = projectTodoPath(root, cwd)
-      mkdirSync(dirname(p), { recursive: true })
-      const out = `${TODO_HEADER}${entries.length ? `\n§\n${entries.join(ENTRY_DELIMITER)}\n` : ''}`
-      writeFileSync(p, out, 'utf8')
-    }
-  }
-
   // -------------------------------------------------------------------------
   // fetch (no local mutation)
   // -------------------------------------------------------------------------
   async fetch(cwd: string): Promise<{ ok: true; conflicts: any[]; remoteFiles: Record<string, string>; status: string } | { ok: false; error: string }> {
     const hash = this.hashFor(cwd)
     const root = this.root()
-    if (isWriteBlockedSync(root)) return { ok: false, error: `write blocked: migration verify mismatch (see ${join(maestroMetaDir(root), 'write-block.json')})` }
     const cfg = readConfig(root, hash)
     if (!cfg) return { ok: false, error: 'sync disabled for this project' }
     // No local mutation, but we need to check remote
@@ -276,7 +223,6 @@ export class SyncService {
   async push(cwd: string, message?: string): Promise<{ ok: true; pushed: boolean; conflicts: any[] } | { ok: false; error: string; conflicts?: any[] }> {
     const hash = this.hashFor(cwd)
     const root = this.root()
-    if (isWriteBlockedSync(root)) return { ok: false, error: `write blocked: migration verify mismatch (see ${join(maestroMetaDir(root), 'write-block.json')})` }
     const cfg = readConfig(root, hash)
     if (!cfg) return { ok: false, error: 'sync disabled for this project' }
 
@@ -286,7 +232,6 @@ export class SyncService {
     const remoteRes = await this.git.getRemoteFiles(cfg.remoteUrl, cfg.branch)
     if (!remoteRes.ok) return { ok: false, error: remoteRes.error }
 
-    const remoteFiles = remoteRes.files
     const meta = readMeta(root, hash)
     const allConflicts: any[] = []
 
@@ -350,7 +295,6 @@ export class SyncService {
   async pull(cwd: string): Promise<{ ok: true; merged: boolean; conflicts: any[] } | { ok: false; error: string; conflicts?: any[] }> {
     const hash = this.hashFor(cwd)
     const root = this.root()
-    if (isWriteBlockedSync(root)) return { ok: false, error: `write blocked: migration verify mismatch (see ${join(maestroMetaDir(root), 'write-block.json')})` }
     const cfg = readConfig(root, hash)
     if (!cfg) return { ok: false, error: 'sync disabled for this project' }
 

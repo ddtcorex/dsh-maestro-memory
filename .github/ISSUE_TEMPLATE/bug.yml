@@ -25,7 +25,7 @@ body:
       options:
         - Memory store / tracks (memory/user/project/key/daily)
         - Cordis plugin (src/host / src/client / DSH preset)
-        - Sync / migration / atomic storage
+        - Sync / atomic storage
         - Snapshot / prompt injection
         - Documentation
         - Other

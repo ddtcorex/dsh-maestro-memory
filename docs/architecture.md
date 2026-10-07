@@ -14,9 +14,9 @@ All registrations are via `ctx.effect(() => disposer, label)` so `stop`/`update`
 
 | Seam | How we use it | Signature (as shipped) | Notes |
 |---|---|---|---|
-| `ctx.tools.register` | `memory`, `maestro_todo`, `memory_suggest` (the migration fixture also checks `skill_manage` and `memory_review_status` as compatibility names, but this plugin does not register them) | `ctx.effect(() => ctx.tools.register(defineTool({name, description, parameters, execute})), 'maestro-memory: tool')` | Content output via `CONTENT_OUTPUT` schema `{content:{type:array,required:true}}` |
+| `ctx.tools.register` | `memory`, `maestro_todo`, `memory_suggest` | `ctx.effect(() => ctx.tools.register(defineTool({name, description, parameters, execute})), 'maestro-memory: tool')` | Content output via `CONTENT_OUTPUT` schema `{content:{type:array,required:true}}` |
 | `ctx.systemPrompt.context` | Bounded snapshot `USER + global MEMORY + current-project KEY` + session header + discipline note | `{name:'memory:snapshot', order: config.snapshotOrder ?? 500, text:(ctx)=>renderSnapshot(store,{cwd,branch,sessionId,sessionName})}` | `renderSnapshot` pure in `src/host/prompt/snapshot.ts`; `daily`/`project` logs never injected; branch-filtered via `store.list('key',cwd,{branch})` |
-| `ctx.connection.rpc.handle` | Package-private RPC `/dsh-maestro-memory` | `conn = ctx.connection ?? ctx.get('connection'); if (!conn?.rpc?.handle) no-op` | Endpoints: `queue.list/decide`, `memory.list/mutate`, `todo.list/mutate`, `status`, `migration.*`, `sync.*`, `skills.list` |
+| `ctx.connection.rpc.handle` | Package-private RPC `/dsh-maestro-memory` | `conn = ctx.connection ?? ctx.get('connection'); if (!conn?.rpc?.handle) no-op` | Endpoints: `queue.list/decide`, `memory.list/mutate`, `todo.list/mutate`, `status`, `sync.*`, `skills.list` |
 | `ctx.workspaceRegistry` (injected) | Resolve `cwd` for project-hash isolation when `exec.agent.session.header.cwd` is absent | `inject = ['tools','systemPrompt','connection']` (workspaceRegistry available via `ctx.get`) | Hash = `sha1(cwd)[:12]` via `storage/layout.ts:projectHash` |
 
 Compatibility matrix (M0): no core owner for `memory`/`maestro_todo`/`memory_suggest` was found in `deepseek-harness/packages/todo/tool-todo` (owns only `todo_write`) or `skill/tool-skill` (owns `skill`). If DSH core later claims one of these names, rollout must pause and choose "configure-off in profile" or "narrow adapter" — do not shadow.
@@ -24,7 +24,7 @@ Compatibility matrix (M0): no core owner for `memory`/`maestro_todo`/`memory_sug
 ## 3. Storage & atomicity
 
 - **Root:** `resolveMemoryRoot(memoryDir ?? join(homedir(),'.dsh','memories'))`
-- **Files:** `MEMORY.md`/`USER.md` + `*-archive.md` + `SUGGESTIONS.jsonl` + `TODOS-life.md`/`TODOS-work.md` + `daily/YYYY-MM-DD.md` + `daily/YYYY-MM-DD.todo.md` + `projects/<hash>/{MEMORY.md,KEY.md,KEY-archive.md,TODOS.md}` + `.maestro-memory/{schema.json,migration-journal.jsonl,backups/<runId>/,write-block.json,sync/<hash>/}`
+- **Files:** `MEMORY.md`/`USER.md` + `*-archive.md` + `SUGGESTIONS.jsonl` + `TODOS-life.md`/`TODOS-work.md` + `daily/YYYY-MM-DD.md` + `daily/YYYY-MM-DD.todo.md` + `projects/<hash>/{MEMORY.md,KEY.md,KEY-archive.md,TODOS.md}` + `.maestro-memory/{sync/<hash>/,delimiter-repaired-v3}`
 - **Delimiter:** `ENTRY_DELIMITER='\n§\n'` byte-compatible with the earlier plugin's `lib/store.js`; `parseEntries`/`serializeEntries`/`isCanonical` in `storage/{legacy-format,atomic-store}.ts`
 - **Atomic write:** per-directory `.maestro.lock` (stale 10s + `kill(pid,0)` liveness, retry 25ms, timeout 5s, reentrancy guard) → validate canonical → dedupe via `stripEntryId`+`isDuplicate` → temp `.<uuid>.tmp` (`wx`,0o600) → `fsync` → `rename` → `fsync` dir → reread validate
 
@@ -44,7 +44,6 @@ src/host/
   review/queue.ts          # SuggestionQueue — SUGGESTIONS.jsonl gating
   storage/{layout,atomic-store,legacy-format}.ts
   prompt/snapshot.ts       # renderSnapshot() — bounded snapshot + discipline note (M0-M1)
-  migration/{service.ts,cli.ts,fixture.ts}
   sync/{service.ts,git.ts,merge.ts,config.ts,layout.ts}  # M5 — opt-in, disabled = zero network
   skills-browser.ts        # M6 — read-only maestro-skills listing
 src/client/index.tsx       # Memory view + Queue + Todo + Skills + Health

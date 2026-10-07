@@ -6,21 +6,14 @@
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
-import { join, dirname } from 'node:path'
-import { Buffer } from 'node:buffer'
+import { dirname } from 'node:path'
 import {
-  parseEntries,
   serializeEntries,
   isDuplicate,
-  stripEntryId,
-  findExactIndex,
   readEntriesSync,
   appendEntryAtomicSync,
   writeEntriesAtomicSync,
   writeAtomicSync,
-  readEntries,
-  appendEntryAtomic,
-  writeEntriesAtomic,
   createBackupSync,
   withLockSync,
 } from '../storage/atomic-store.ts'
@@ -37,18 +30,15 @@ import {
   userArchivePath,
   projectKeyArchivePath,
   projectArchivePath,
-  maestroMetaDir,
 } from '../storage/layout.ts'
 import {
   parseEntryBranches,
   parseEntrySummary,
-  stripEntrySummary,
   autoSummary,
   extractEntryDate,
-  BRANCH_TAG_RE,
-  SUMMARY_TAG_RE,
 } from '../storage/legacy-format.ts'
 import { desensitize } from './sanitize.ts'
+import { todayStamp } from '../todo/store.ts'
 
 export type MemoryTarget = 'memory' | 'global' | 'user' | 'project' | 'key' | 'daily'
 export type MemoryAction = 'add' | 'list' | 'replace' | 'remove' | 'archive' | 'expand'
@@ -85,32 +75,11 @@ function genId(): string {
   return randomUUID().replace(/-/g, '').slice(0, 8)
 }
 
-function todayStamp(): string {
-  // Local calendar date (matching TodoStore.todayStamp) so daily memory and
-  // daily todos land on the same "today" — UTC here drifted a day for
-  // timezones east of UTC around midnight.
-  const d = new Date()
-  const mm = String(d.getMonth() + 1).padStart(2, '0')
-  const dd = String(d.getDate()).padStart(2, '0')
-  return `${d.getFullYear()}-${mm}-${dd}`
-}
-
 function timeStamp(): string {
   const d = new Date()
   const hh = String(d.getHours()).padStart(2, '0')
   const mm = String(d.getMinutes()).padStart(2, '0')
   return `${hh}:${mm}`
-}
-
-function isWriteBlockedSync(root: string): boolean {
-  try {
-    const p = join(maestroMetaDir(root), 'write-block.json')
-    if (!existsSync(p)) return false
-    const data = JSON.parse(readFileSync(p, 'utf8'))
-    return data.blocked === true
-  } catch {
-    return false
-  }
 }
 
 export class MaestroMemoryStore {
@@ -123,13 +92,6 @@ export class MaestroMemoryStore {
 
   private root(): string {
     return resolveMemoryRoot(this.memoryDir)
-  }
-
-  private assertNotBlocked(): void {
-    const r = this.root()
-    if (isWriteBlockedSync(r)) {
-      throw new Error(`write blocked: migration verify mismatch (see ${join(maestroMetaDir(r), 'write-block.json')})`)
-    }
   }
 
   private fileFor(target: MemoryTarget, cwd?: string, date?: string): string {
@@ -279,7 +241,7 @@ export class MaestroMemoryStore {
    * So: keep a canonical tag as-is, move a trailing one to the header, and only
    * then fall back to generating one.
    */
-  private ensureAutoSummary(entry: string, target: MemoryTarget): string {
+  private ensureAutoSummary(entry: string): string {
     if (parseEntrySummary(entry) !== null) return entry
     const trailing = /\[summary:([^\]]*)\]\s*$/.exec(entry)
     if (trailing) {
@@ -403,7 +365,6 @@ export class MaestroMemoryStore {
     opts: { branches?: string; summary?: string; date?: string; desensitize?: boolean } = {},
   ): { ok: true; duplicate?: boolean; id?: string; entry?: string } | { ok: false; error: string } {
     try {
-      this.assertNotBlocked()
     } catch (e: any) {
       return { ok: false, error: e?.message ?? String(e) }
     }
@@ -442,9 +403,9 @@ export class MaestroMemoryStore {
         content = this.applySummaryTag(content, opts.summary)
       }
       content = this.ensureId(content)
-      content = this.ensureAutoSummary(content, t)
+      content = this.ensureAutoSummary(content)
     } else {
-      content = this.ensureAutoSummary(content, t)
+      content = this.ensureAutoSummary(content)
     }
     let file: string
     try {
@@ -482,7 +443,6 @@ export class MaestroMemoryStore {
     opts: { date?: string } = {},
   ): { ok: true } | { ok: false; error: string; matches?: string[] } {
     try {
-      this.assertNotBlocked()
     } catch (e: any) {
       return { ok: false, error: e?.message ?? String(e) }
     }
@@ -516,7 +476,7 @@ export class MaestroMemoryStore {
         }
       }
       replacement = this.ensureDatePrefix(replacement)
-      replacement = this.ensureAutoSummary(replacement, t)
+      replacement = this.ensureAutoSummary(replacement)
       const idx = entries.indexOf(oldEntry)
       const next = [...entries]
       next[idx] = replacement
@@ -534,7 +494,6 @@ export class MaestroMemoryStore {
     opts: { date?: string } = {},
   ): { ok: true; removed?: string } | { ok: false; error: string; matches?: string[] } {
     try {
-      this.assertNotBlocked()
     } catch (e: any) {
       return { ok: false, error: e?.message ?? String(e) }
     }
@@ -569,7 +528,6 @@ export class MaestroMemoryStore {
     cwd?: string,
   ): { ok: true } | { ok: false; error: string } {
     try {
-      this.assertNotBlocked()
     } catch (e: any) {
       return { ok: false, error: e?.message ?? String(e) }
     }
@@ -654,7 +612,7 @@ export class MaestroMemoryStore {
     return this.list('key', cwd, opts)
   }
 
-  listDaily(cwd?: string, date?: string, opts: ListOpts = {}): string[] {
+  listDaily(date?: string, opts: ListOpts = {}): string[] {
     // For backward compat, daily list without date uses today
     if (date) {
       const p = dailyPath(this.root(), date)
@@ -718,7 +676,6 @@ export class MaestroMemoryStore {
    */
   repairFile(filePath: string): RepairFileResult {
     try {
-      this.assertNotBlocked()
     } catch (e: any) {
       return { ok: false, error: e?.message ?? String(e) }
     }
@@ -794,7 +751,6 @@ export class MaestroMemoryStore {
    */
   applyArchive(target: MemoryTarget, cwd: string | undefined, archive: string[]): ApplyArchiveResult {
     try {
-      this.assertNotBlocked()
     } catch (e: any) {
       return { ok: false, error: e?.message ?? String(e) }
     }
@@ -817,55 +773,5 @@ export class MaestroMemoryStore {
       writeAtomicSync(file, serializeEntries(remaining))
       return { ok: true as const, archived: moving.length, backup }
     })
-  }
-}
-
-// Re-export ArchiveStore for direct use (matches legacy)
-export class MaestroArchiveStore {
-  constructor(private readonly memoryDir: string | null = null) {}
-
-  private root(): string {
-    return resolveMemoryRoot(this.memoryDir)
-  }
-
-  fileFor(target: MemoryTarget, cwd?: string): string {
-    const r = this.root()
-    const t = normalizeTarget(target)
-    if (t === 'memory') return globalArchivePath(r)
-    if (t === 'user') return userArchivePath(r)
-    if (t === 'key') {
-      if (!cwd) throw new Error('key archive requires cwd')
-      return projectKeyArchivePath(r, cwd)
-    }
-    if (t === 'project') {
-      if (!cwd) throw new Error('project archive requires cwd')
-      return projectArchivePath(r, cwd)
-    }
-    throw new Error(`archive only for memory/user/key/project`)
-  }
-
-  entries(target: MemoryTarget, cwd?: string): string[] {
-    return readEntriesSync(this.fileFor(target, cwd))
-  }
-
-  append(target: MemoryTarget, content: string, cwd?: string): { ok: true } | { ok: false; error: string } {
-    const p = this.fileFor(target, cwd)
-    const res = appendEntryAtomicSync(p, content)
-    if (!res.ok) return { ok: false, error: res.error }
-    return { ok: true }
-  }
-
-  remove(target: MemoryTarget, match: string, cwd?: string): { ok: true } | { ok: false; error: string } {
-    const p = this.fileFor(target, cwd)
-    const entries = readEntriesSync(p)
-    const matches = entries.filter((e) => e.includes(match))
-    if (matches.length === 0) return { ok: false, error: `no archive match for "${match}"` }
-    if (matches.length > 1) return { ok: false, error: `ambiguous archive match` }
-    const idx = entries.indexOf(matches[0])
-    const next = [...entries]
-    next.splice(idx, 1)
-    const res = writeEntriesAtomicSync(p, next)
-    if (!res.ok) return { ok: false, error: res.error }
-    return { ok: true }
   }
 }

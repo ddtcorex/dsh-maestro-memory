@@ -151,24 +151,4 @@ existing machine pick up a new repair rule exactly once.)
 
 Maintenance runs through the `memory.repair` and `memory.maintenance` RPC endpoints
 described under UI & RPC above (preview-first, `confirm: true` to write). There are
-no standalone maintenance scripts; `scripts/` only holds the build, migration and
-sync-worker helpers.
-
-## Cutover
-
-1. Backup: `node scripts/migrate.mjs --root ~/.dsh/memories --apply`
-2. Verify: `node scripts/migrate.mjs --root ~/.dsh/memories --verify` (must be `ok=true`)
-3. Swap profile: remove the earlier memory plugin, add `dsh-maestro-memory` as `link:` or pinned SHA.
-4. Restart `dsh web` at user-approved window, then live-read each track.
-
-Rollback: `rollback(root, runId)` restores byte-identical files from `backups/<runId>/`.
-
-## Migration CLI
-
-`node scripts/migrate.mjs --root <path> [--inspect|--dry-run|--verify|--apply]`
-
-Default read-only; only `--apply` writes `manifest.json` + `backups/<runId>/files/` + `schema.json`.
-
-## Verification
-
-After `--apply`/`--verify`: `ok=true`, `mismatches=[]`, `manifest.json` byte-identical. Rehearsal suite `tests/m4-rehearsal.spec.ts` covers fixture `link:` profile → backup → verify → rollback.
+no standalone maintenance scripts; `scripts/` only holds the build helper.

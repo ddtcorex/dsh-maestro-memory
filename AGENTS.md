@@ -19,7 +19,6 @@ Part of the Maestro Harness suite (installed as a DSH plugin). Originally forked
 - `src/host/memory/write-guard.ts` — per-turn write watchdog: `createWriteGapCounter(ctx, isEnabled)` counts consecutive human turns that did work but wrote no guarded track, on `agent/turn-stopping`; `readTurnFacts(agent)` reads turn origin + tool activity from the session log; `isGuardedTrack(target)` is the `daily`/`project` predicate.
 - `src/host/storage/` — `layout.ts` (paths), `atomic-store.ts` (append/read/write with directory lock), `legacy-format.ts` (entry parsing, summary/branch tags).
 - `src/host/sync/` — git-backed memory sync (`SyncService`, `RealGitAdapter`, merge/conflict resolution).
-- `src/host/migration/` — staged replacement service (`inspect`/`dryRun`/`run`/`verify`/`rollback`, read-only by default, `--apply` to mutate).
 - `src/host/review/queue.ts` — gated `memory_suggest` confirmation queue.
 - `src/host/skills-browser.ts` — read-only skills list (M6).
 - `src/client/index.tsx` — browser half (Memory view with Memory, Queue, Todo, Skills and Health tabs; no Sync tab).

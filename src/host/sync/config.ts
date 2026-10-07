@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { dirname } from 'node:path'
 import { syncConfigPath, syncDir, syncMetaPath } from './layout.ts'
 
 export interface SyncConfig {
@@ -31,11 +31,6 @@ export function readConfig(root: string, hash: string): SyncConfig | null {
   } catch {
     return null
   }
-}
-
-export function isEnabled(root: string, hash: string): boolean {
-  const cfg = readConfig(root, hash)
-  return cfg !== null && cfg.enabled === true
 }
 
 export function writeConfig(root: string, hash: string, cfg: SyncConfig): void {

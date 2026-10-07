@@ -90,30 +90,10 @@ export function workTodoPath(root: string): string {
 export function maestroMetaDir(root: string): string {
   return join(root, '.maestro-memory')
 }
-export function schemaPath(root: string): string {
-  return join(maestroMetaDir(root), 'schema.json')
-}
-export function journalPath(root: string): string {
-  return join(maestroMetaDir(root), 'migration-journal.jsonl')
-}
-export function backupsDir(root: string): string {
-  return join(maestroMetaDir(root), 'backups')
-}
 export function todoArchivePath(root: string): string {
   return join(root, 'TODO-archive.md')
 }
-export function backupManifestPath(root: string, runId: string): string {
-  if (!runId) throw new Error('backupManifestPath: runId is required')
-  return join(backupsDir(root), runId, 'manifest.json')
-}
-export function backupFilesDirPath(root: string, runId: string): string {
-  if (!runId) throw new Error('backupFilesDirPath: runId is required')
-  return join(backupsDir(root), runId, 'files')
-}
 
-// ---------------------------------------------------------------------------
-// Aggregated pure resolvers — convenience for inspectors/migration
-// ---------------------------------------------------------------------------
 
 /**
  * Resolve all five memory files at once (pure).
@@ -169,36 +149,3 @@ export function allArchivePaths(root: string, cwd: string): {
     projectMemoryArchive: projectArchivePath(root, cwd),
   }
 }
-
-/**
- * Resolve metadata files at once (pure).
- */
-export function allMetadataPaths(root: string, runId?: string): {
-  metaDir: string
-  schema: string
-  journal: string
-  backupsDir: string
-  backupManifest: string | undefined
-  backupFilesDir: string | undefined
-} {
-  const meta = maestroMetaDir(root)
-  const bDir = backupsDir(root)
-  return {
-    metaDir: meta,
-    schema: schemaPath(root),
-    journal: journalPath(root),
-    backupsDir: bDir,
-    backupManifest: runId ? backupManifestPath(root, runId) : undefined,
-    backupFilesDir: runId ? backupFilesDirPath(root, runId) : undefined,
-  }
-}
-
-// Aliases for spec compatibility (different naming conventions)
-export const resolveMemoryFiles = allMemoryPaths
-export const resolveTodoFiles = allTodoPaths
-export const resolveArchiveFiles = allArchivePaths
-export const resolveMetadataFiles = allMetadataPaths
-export const getMemoryPaths = allMemoryPaths
-export const getTodoPaths = allTodoPaths
-export const getArchivePaths = allArchivePaths
-export const getMetadataPaths = allMetadataPaths

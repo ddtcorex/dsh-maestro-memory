@@ -233,7 +233,7 @@ export function renderSnapshotWithStats(
 
   // Recent daily slot (512B) — last 2 days' newest entries
   // Keeps recent context without exceeding cap; full logs remain query-only.
-  // Use local calendar (matching store.todayStamp) to avoid UTC/local drift near midnight.
+  // Use local calendar (matching todayStamp) to avoid UTC/local drift near midnight.
   try {
     const recentDaily: string[] = []
     // Oldest first: fitSection() treats the last element as the newest and keeps
