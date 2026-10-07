@@ -15,3 +15,13 @@
       config:
         memoryDir: null
         snapshotOrder: 500
+
+# DSH 0.2.x resolves `webServer` for `ctx.connection.rpc.handle` on the
+# `connection` row own fiber, so a row-level inject cannot reach it. `inject`
+# replaces the base list, hence `webRuntime` (the base row needs it for
+# trustedHosts) is repeated. Identical in every maestro package that registers
+# RPC channels, so each one stays installable alone.
+- id: connection
+  inject:
+    - webRuntime
+    - webServer
