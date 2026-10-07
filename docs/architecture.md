@@ -55,5 +55,5 @@ tests/                     # vitest specs, one file per area (`pnpm test` report
 
 - **Spec (source of truth):** `<workspace-root>/docs/specs/dsh-maestro-memory.md` and this repo's `README.md`
 - **Plans:** transient, deleted from `<workspace-root>/docs/plans/` once a batch ships; none to link
-- **Sync design:** `<workspace-root>/docs/sync-design.md`
+- **Sync design:** `<workspace-root>/docs/SYNC-DESIGN.md`
 - **Umbrella architecture:** `<workspace-root>/docs/architecture.md`
