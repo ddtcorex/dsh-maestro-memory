@@ -19,6 +19,8 @@ All notable changes to this project are documented in this file. Format follows
 - **Unused layout helpers.** `journalPath`, `backupsDir`,
   `backupManifestPath`, `backupFilesDirPath`, `schemaPath` and
   `allMetadataPaths` had no callers left after the migration removal.
+- **The duplicate `todayStamp` in the memory store.** It now imports the
+  exported copy from the todo store.
 
 ## [2.2.1] - 2026-10-07
 

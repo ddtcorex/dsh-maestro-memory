@@ -26,7 +26,10 @@ export type TodoQuadrant = 'q1' | 'q2' | 'q3' | 'q4'
 
 export const DEFAULT_VIEW_LIMIT = 8
 
-/** Local date YYYY-MM-DD (local time, not UTC) */
+/**
+ * Local date YYYY-MM-DD (local time, not UTC). Shared with the memory store so
+ * daily memory and daily todos land on the same "today".
+ */
 export function todayStamp(): string {
   const d = new Date()
   const mm = String(d.getMonth() + 1).padStart(2, '0')

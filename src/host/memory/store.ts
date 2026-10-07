@@ -38,6 +38,7 @@ import {
   extractEntryDate,
 } from '../storage/legacy-format.ts'
 import { desensitize } from './sanitize.ts'
+import { todayStamp } from '../todo/store.ts'
 
 export type MemoryTarget = 'memory' | 'global' | 'user' | 'project' | 'key' | 'daily'
 export type MemoryAction = 'add' | 'list' | 'replace' | 'remove' | 'archive' | 'expand'
@@ -72,16 +73,6 @@ function normalizeTarget(t: string): MemoryTarget {
 
 function genId(): string {
   return randomUUID().replace(/-/g, '').slice(0, 8)
-}
-
-function todayStamp(): string {
-  // Local calendar date (matching TodoStore.todayStamp) so daily memory and
-  // daily todos land on the same "today" — UTC here drifted a day for
-  // timezones east of UTC around midnight.
-  const d = new Date()
-  const mm = String(d.getMonth() + 1).padStart(2, '0')
-  const dd = String(d.getDate()).padStart(2, '0')
-  return `${d.getFullYear()}-${mm}-${dd}`
 }
 
 function timeStamp(): string {
