@@ -58,15 +58,6 @@ function readTodoTrackRaw(root: string, cwd: string): string[] {
   return body.split(ENTRY_DELIMITER).map((s) => s.trim()).filter(Boolean)
 }
 
-function todoIds(entries: string[]): Set<string> {
-  const s = new Set<string>()
-  for (const e of entries) {
-    const parsed = parseTodoEntry(e)
-    if (parsed?.id) s.add(parsed.id.toLowerCase())
-  }
-  return s
-}
-
 function extractId(entry: string): string | null {
   const m = /^\[id:\s*([0-9a-f]{8})\]\s*/i.exec(entry)
   if (m) return m[1].toLowerCase()
@@ -175,13 +166,6 @@ export class SyncService {
     writeFileSync(p, lines ? lines + '\n' : '', 'utf8')
   }
 
-  private appendConflict(cwd: string, rec: any): void {
-    const hash = this.hashFor(cwd)
-    const p = syncConflictsPath(this.root(), hash)
-    mkdirSync(dirname(p), { recursive: true })
-    appendFileSync(p, JSON.stringify(rec) + '\n', 'utf8')
-  }
-
   // -------------------------------------------------------------------------
   // internal helpers: collect local files as remote map
   // -------------------------------------------------------------------------
@@ -197,31 +181,6 @@ export class SyncService {
     const todoText = todoEntries.length ? `${TODO_HEADER}\n§\n${todoEntries.join(ENTRY_DELIMITER)}\n` : `${TODO_HEADER}`
     out['TODOS.md'] = todoText
     return out
-  }
-
-  private writeLocalFiles(cwd: string, files: Record<string, string>): void {
-    const root = this.root()
-    if (files['KEY.md'] !== undefined) {
-      const entries = parseEntries(files['KEY.md'])
-      writeMemoryTrack(root, cwd, 'KEY', entries)
-    }
-    if (files['MEMORY.md'] !== undefined) {
-      const entries = parseEntries(files['MEMORY.md'])
-      writeMemoryTrack(root, cwd, 'MEMORY', entries)
-    }
-    if (files['KEY-archive.md'] !== undefined) {
-      const entries = parseEntries(files['KEY-archive.md'])
-      writeMemoryTrack(root, cwd, 'KEY-archive', entries)
-    }
-    if (files['TODOS.md'] !== undefined) {
-      const text = files['TODOS.md']
-      const body = text.replace(/^<!--[\s\S]*?-->\s*/, '').replace(/^\s*§\s*\n?/, '').trim()
-      const entries = body ? body.split(ENTRY_DELIMITER).map((s) => s.trim()).filter(Boolean) : []
-      const p = projectTodoPath(root, cwd)
-      mkdirSync(dirname(p), { recursive: true })
-      const out = `${TODO_HEADER}${entries.length ? `\n§\n${entries.join(ENTRY_DELIMITER)}\n` : ''}`
-      writeFileSync(p, out, 'utf8')
-    }
   }
 
   // -------------------------------------------------------------------------
@@ -286,7 +245,6 @@ export class SyncService {
     const remoteRes = await this.git.getRemoteFiles(cfg.remoteUrl, cfg.branch)
     if (!remoteRes.ok) return { ok: false, error: remoteRes.error }
 
-    const remoteFiles = remoteRes.files
     const meta = readMeta(root, hash)
     const allConflicts: any[] = []
 

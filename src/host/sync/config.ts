@@ -33,11 +33,6 @@ export function readConfig(root: string, hash: string): SyncConfig | null {
   }
 }
 
-export function isEnabled(root: string, hash: string): boolean {
-  const cfg = readConfig(root, hash)
-  return cfg !== null && cfg.enabled === true
-}
-
 export function writeConfig(root: string, hash: string, cfg: SyncConfig): void {
   const p = syncConfigPath(root, hash)
   mkdirSync(dirname(p), { recursive: true })

@@ -20,20 +20,3 @@ export function syncConflictsPath(root: string, hash: string): string {
 export function syncBranchName(hash: string): string {
   return `maestro-memory/${hash}`
 }
-
-export function resolveSyncHash(cwd: string): string {
-  return projectHash(cwd)
-}
-
-// aggregated for tests
-export function allSyncPaths(root: string, cwd: string) {
-  const hash = projectHash(cwd)
-  return {
-    dir: syncDir(root, hash),
-    config: syncConfigPath(root, hash),
-    meta: syncMetaPath(root, hash),
-    conflicts: syncConflictsPath(root, hash),
-    branch: syncBranchName(hash),
-    hash,
-  }
-}
