@@ -27,7 +27,7 @@ dsh plugin --profile web add link:<workspace-root>/packages/dsh-maestro-memory
 # production: dsh plugin --profile web add github:ddtcorex/dsh-maestro-memory#<tag-or-sha>
 ```
 
-`cordis.patch.yml` is shipped with the package — do not duplicate it in the profile.
+`cordis.patch.yml` is shipped with the package, including a `connection` entry that declares `webServer` (DSH 0.2.x needs it before `rpc.handle` can register a channel). Do not duplicate it in the profile. Pin a release with `@ddtcorex/dsh-maestro-memory@<version>` when installing from npm, and run `pnpm install && pnpm build` after every `git pull` of a `link:` checkout.
 
 ```yaml
 - insert:
