@@ -3,9 +3,9 @@
  * Disabled => zero Git activity (no spawn).
  */
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { dirname } from 'node:path'
 import { randomBytes } from 'node:crypto'
-import { resolveMemoryRoot, maestroMetaDir } from '../storage/layout.ts'
+import { resolveMemoryRoot } from '../storage/layout.ts'
 import { projectHash, projectKeyPath, projectMemoryPath, projectKeyArchivePath, projectTodoPath } from '../storage/layout.ts'
 import { parseEntries, serializeEntries } from '../storage/atomic-store.ts'
 import { parseTodoEntry, TODO_HEADER, ENTRY_DELIMITER } from '../storage/legacy-format.ts'
@@ -65,17 +65,6 @@ function extractId(entry: string): string | null {
   const pm = parseTodoEntry(entry)
   if (pm?.id) return pm.id.toLowerCase()
   return null
-}
-
-function isWriteBlockedSync(root: string): boolean {
-  try {
-    const p = join(maestroMetaDir(root), 'write-block.json')
-    if (!existsSync(p)) return false
-    const data = JSON.parse(readFileSync(p, 'utf8'))
-    return data.blocked === true
-  } catch {
-    return false
-  }
 }
 
 export class SyncService {
@@ -189,7 +178,6 @@ export class SyncService {
   async fetch(cwd: string): Promise<{ ok: true; conflicts: any[]; remoteFiles: Record<string, string>; status: string } | { ok: false; error: string }> {
     const hash = this.hashFor(cwd)
     const root = this.root()
-    if (isWriteBlockedSync(root)) return { ok: false, error: `write blocked: migration verify mismatch (see ${join(maestroMetaDir(root), 'write-block.json')})` }
     const cfg = readConfig(root, hash)
     if (!cfg) return { ok: false, error: 'sync disabled for this project' }
     // No local mutation, but we need to check remote
@@ -235,7 +223,6 @@ export class SyncService {
   async push(cwd: string, message?: string): Promise<{ ok: true; pushed: boolean; conflicts: any[] } | { ok: false; error: string; conflicts?: any[] }> {
     const hash = this.hashFor(cwd)
     const root = this.root()
-    if (isWriteBlockedSync(root)) return { ok: false, error: `write blocked: migration verify mismatch (see ${join(maestroMetaDir(root), 'write-block.json')})` }
     const cfg = readConfig(root, hash)
     if (!cfg) return { ok: false, error: 'sync disabled for this project' }
 
@@ -308,7 +295,6 @@ export class SyncService {
   async pull(cwd: string): Promise<{ ok: true; merged: boolean; conflicts: any[] } | { ok: false; error: string; conflicts?: any[] }> {
     const hash = this.hashFor(cwd)
     const root = this.root()
-    if (isWriteBlockedSync(root)) return { ok: false, error: `write blocked: migration verify mismatch (see ${join(maestroMetaDir(root), 'write-block.json')})` }
     const cfg = readConfig(root, hash)
     if (!cfg) return { ok: false, error: 'sync disabled for this project' }
 

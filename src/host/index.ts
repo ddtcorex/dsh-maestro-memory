@@ -13,7 +13,7 @@ import { buildFeedbackLine } from './memory/feedback.ts'
 import { TodoStore, resolveQuadrant } from './todo/store.ts'
 import { TODO_TARGETS, TODO_STATUSES } from './storage/legacy-format.ts'
 import { SuggestionQueue, enqueueSuggestion, approveSuggestions, rejectSuggestions } from './review/queue.ts'
-import { resolveMemoryRoot, suggestionsPath, globalArchivePath, userArchivePath, projectKeyArchivePath, todoArchivePath, maestroMetaDir, isWriteBlocked } from './storage/layout.ts'
+import { resolveMemoryRoot, suggestionsPath, globalArchivePath, userArchivePath, projectKeyArchivePath, todoArchivePath, maestroMetaDir } from './storage/layout.ts'
 import { appendEntryAtomicSync } from './storage/atomic-store.ts'
 import { SyncService } from './sync/service.ts'
 import { RealGitAdapter } from './sync/git.ts'
@@ -654,7 +654,7 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
           return { ok: false, error: `unknown todo action ${action}` }
         }
         case 'status': {
-          return { ok: true, queue: queue.read().length, blocked: isWriteBlocked(root) }
+          return { ok: true, queue: queue.read().length }
         }
         case 'memory.repair': {
           // Preview-first: cleaning a store file is a write, so `dryRun` is the

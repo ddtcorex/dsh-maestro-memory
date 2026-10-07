@@ -6,7 +6,7 @@
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
-import { join, dirname } from 'node:path'
+import { dirname } from 'node:path'
 import {
   serializeEntries,
   isDuplicate,
@@ -30,7 +30,6 @@ import {
   userArchivePath,
   projectKeyArchivePath,
   projectArchivePath,
-  maestroMetaDir,
 } from '../storage/layout.ts'
 import {
   parseEntryBranches,
@@ -92,17 +91,6 @@ function timeStamp(): string {
   return `${hh}:${mm}`
 }
 
-function isWriteBlockedSync(root: string): boolean {
-  try {
-    const p = join(maestroMetaDir(root), 'write-block.json')
-    if (!existsSync(p)) return false
-    const data = JSON.parse(readFileSync(p, 'utf8'))
-    return data.blocked === true
-  } catch {
-    return false
-  }
-}
-
 export class MaestroMemoryStore {
   constructor(private readonly memoryDir: string | null = null) {}
 
@@ -113,13 +101,6 @@ export class MaestroMemoryStore {
 
   private root(): string {
     return resolveMemoryRoot(this.memoryDir)
-  }
-
-  private assertNotBlocked(): void {
-    const r = this.root()
-    if (isWriteBlockedSync(r)) {
-      throw new Error(`write blocked: migration verify mismatch (see ${join(maestroMetaDir(r), 'write-block.json')})`)
-    }
   }
 
   private fileFor(target: MemoryTarget, cwd?: string, date?: string): string {
@@ -393,7 +374,6 @@ export class MaestroMemoryStore {
     opts: { branches?: string; summary?: string; date?: string; desensitize?: boolean } = {},
   ): { ok: true; duplicate?: boolean; id?: string; entry?: string } | { ok: false; error: string } {
     try {
-      this.assertNotBlocked()
     } catch (e: any) {
       return { ok: false, error: e?.message ?? String(e) }
     }
@@ -472,7 +452,6 @@ export class MaestroMemoryStore {
     opts: { date?: string } = {},
   ): { ok: true } | { ok: false; error: string; matches?: string[] } {
     try {
-      this.assertNotBlocked()
     } catch (e: any) {
       return { ok: false, error: e?.message ?? String(e) }
     }
@@ -524,7 +503,6 @@ export class MaestroMemoryStore {
     opts: { date?: string } = {},
   ): { ok: true; removed?: string } | { ok: false; error: string; matches?: string[] } {
     try {
-      this.assertNotBlocked()
     } catch (e: any) {
       return { ok: false, error: e?.message ?? String(e) }
     }
@@ -559,7 +537,6 @@ export class MaestroMemoryStore {
     cwd?: string,
   ): { ok: true } | { ok: false; error: string } {
     try {
-      this.assertNotBlocked()
     } catch (e: any) {
       return { ok: false, error: e?.message ?? String(e) }
     }
@@ -708,7 +685,6 @@ export class MaestroMemoryStore {
    */
   repairFile(filePath: string): RepairFileResult {
     try {
-      this.assertNotBlocked()
     } catch (e: any) {
       return { ok: false, error: e?.message ?? String(e) }
     }
@@ -784,7 +760,6 @@ export class MaestroMemoryStore {
    */
   applyArchive(target: MemoryTarget, cwd: string | undefined, archive: string[]): ApplyArchiveResult {
     try {
-      this.assertNotBlocked()
     } catch (e: any) {
       return { ok: false, error: e?.message ?? String(e) }
     }

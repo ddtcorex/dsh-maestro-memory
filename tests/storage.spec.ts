@@ -2,8 +2,6 @@ import { describe, it, expect } from 'vitest'
 import { createHash } from 'node:crypto'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import { parseEntries, serializeEntries, isCanonical } from '../src/host/storage/legacy-format.ts'
 import {
   projectHash,
@@ -36,7 +34,6 @@ import {
   allMetadataPaths,
   projectArchivePath,
   projectArchiveDir,
-  isWriteBlocked,
 } from '../src/host/storage/layout.ts'
 import { isDuplicate, stripEntryId } from '../src/host/storage/atomic-store.ts'
 
@@ -194,22 +191,5 @@ describe('atomic-store duplicates', () => {
   })
   it('strip id', () => {
     expect(stripEntryId('[id: abcdef12] hi')).toBe('hi')
-  })
-})
-
-describe('isWriteBlocked', () => {
-  const flag = (body: string) => {
-    const root = mkdtempSync(join(tmpdir(), 'mm-wb-'))
-    mkdirSync(maestroMetaDir(root), { recursive: true })
-    writeFileSync(join(maestroMetaDir(root), 'write-block.json'), body)
-    return root
-  }
-  it('is false without a flag file', () => {
-    expect(isWriteBlocked(mkdtempSync(join(tmpdir(), 'mm-wb-')))).toBe(false)
-  })
-  it('follows the blocked field and fails closed on garbage', () => {
-    expect(isWriteBlocked(flag('{"blocked":true}'))).toBe(true)
-    expect(isWriteBlocked(flag('{"blocked":false}'))).toBe(false)
-    expect(isWriteBlocked(flag('not json'))).toBe(true)
   })
 })

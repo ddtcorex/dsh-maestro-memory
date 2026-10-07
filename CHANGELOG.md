@@ -12,8 +12,10 @@ All notable changes to this project are documented in this file. Format follows
   `~/.dsh/memories` layout is no longer shipped: the `migration.*` RPC
   endpoints, `scripts/migrate.mjs` and the migration service are gone.
   Anyone still on the old layout must migrate with the last release that
-  contains it (2.2.1). The `write-block.json` guard and the `blocked` flag
-  in `status` are unchanged.
+  contains it (2.2.1).
+- **The `write-block.json` write guard.** Nothing writes that flag any more,
+  so the memory store, todo store and sync service no longer check it, the
+  `status` RPC no longer reports `blocked`, and `isWriteBlocked` is gone.
 
 ## [2.2.1] - 2026-10-07
 

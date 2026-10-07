@@ -14,22 +14,11 @@
  */
 
 import { randomBytes } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { resolveMemoryRoot, lifeTodoPath, workTodoPath, projectTodoPath, dailyTodoPath, maestroMetaDir } from '../storage/layout.ts'
+import { resolveMemoryRoot, lifeTodoPath, workTodoPath, projectTodoPath, dailyTodoPath } from '../storage/layout.ts'
 import { parseTodoEntry, stampTodoLine, ENTRY_DELIMITER, TODO_HEADER, TODO_TARGETS, TODO_STATUSES } from '../storage/legacy-format.ts'
 import { withLockSync } from '../storage/atomic-store.ts'
-
-function isWriteBlockedSync(root: string): boolean {
-  try {
-    const p = join(maestroMetaDir(root), 'write-block.json')
-    if (!existsSync(p)) return false
-    const data = JSON.parse(readFileSync(p, 'utf8'))
-    return data.blocked === true
-  } catch {
-    return false
-  }
-}
 
 export type TodoTarget = (typeof TODO_TARGETS)[number]
 export type TodoStatus = (typeof TODO_STATUSES)[number]
@@ -158,15 +147,8 @@ export class TodoStore {
     return all
   }
 
-  private assertNotBlocked(): void {
-    if (isWriteBlockedSync(this.root())) {
-      throw new Error(`write blocked: migration verify mismatch (see ${join(maestroMetaDir(this.root()), 'write-block.json')})`)
-    }
-  }
-
   /** Atomically write one track's items (header + entries) under directory lock */
   private write(target: TodoTarget, cwd: string | undefined, items: { raw: string }[], date?: string): void {
-    this.assertNotBlocked()
     const p = this.pathFor(target, cwd, date)
     const dir = dirname(p)
     mkdirSync(dir, { recursive: true })
