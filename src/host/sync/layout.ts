@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { maestroMetaDir, projectHash } from '../storage/layout.ts'
+import { maestroMetaDir } from '../storage/layout.ts'
 
 export function syncDir(root: string, hash: string): string {
   return join(maestroMetaDir(root), 'sync', hash)

@@ -10,7 +10,6 @@ import { join, dirname } from 'node:path'
 import { createHash } from 'node:crypto'
 
 const COMPAT_TOOLS = ['memory', 'maestro_todo', 'skill_manage', 'memory_suggest', 'memory_review_status'] as const
-type CompatTool = typeof COMPAT_TOOLS[number]
 
 /**
  * Known tool ownership map for rehearsal.

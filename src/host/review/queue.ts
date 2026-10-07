@@ -4,7 +4,7 @@
  * Handles append/dedupe/edited approval/reject/archive/malformed JSONL/recovery.
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync, renameSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { withLockSync } from '../storage/atomic-store.ts'
 import { resolveMemoryRoot, suggestionsPath } from '../storage/layout.ts'

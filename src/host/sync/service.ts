@@ -2,7 +2,7 @@
  * sync/service.ts — enable/disable/status/fetch/push/pull/resolve
  * Disabled => zero Git activity (no spawn).
  */
-import { existsSync, readFileSync, writeFileSync, mkdirSync, appendFileSync, rmSync, readdirSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { resolveMemoryRoot, maestroMetaDir } from '../storage/layout.ts'
@@ -10,11 +10,11 @@ import { projectHash, projectKeyPath, projectMemoryPath, projectKeyArchivePath, 
 import { parseEntries, serializeEntries } from '../storage/atomic-store.ts'
 import { parseTodoEntry, TODO_HEADER, ENTRY_DELIMITER } from '../storage/legacy-format.ts'
 import { readEntriesSync, writeEntriesAtomicSync } from '../storage/atomic-store.ts'
-import { syncBranchName, syncConflictsPath, syncDir } from './layout.ts'
+import { syncBranchName, syncConflictsPath } from './layout.ts'
 import { readConfig, writeConfig, clearConfig, readMeta, writeMeta, baseIdsFromMeta, SyncConfig, SyncMeta } from './config.ts'
-import { mergeMemoryEntries, mergeTodoEntries, snapshotIds, mapById } from './merge.ts'
+import { mergeMemoryEntries, mergeTodoEntries } from './merge.ts'
 import type { GitAdapter } from './git.ts'
-import { MockGitAdapter, RealGitAdapter } from './git.ts'
+import { MockGitAdapter } from './git.ts'
 
 const TRACK_FILES: Record<string, (root: string, cwd: string) => string> = {
   KEY: (root, cwd) => projectKeyPath(root, cwd),

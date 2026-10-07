@@ -11,13 +11,11 @@ import {
   existsSync,
   readFileSync,
   readdirSync,
-  statSync,
   mkdirSync,
   writeFileSync,
   appendFileSync,
   copyFileSync,
   rmSync,
-  unlinkSync,
 } from 'node:fs'
 import { join, relative, dirname } from 'node:path'
 import {

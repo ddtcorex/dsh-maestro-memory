@@ -7,20 +7,13 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { join, dirname } from 'node:path'
-import { Buffer } from 'node:buffer'
 import {
-  parseEntries,
   serializeEntries,
   isDuplicate,
-  stripEntryId,
-  findExactIndex,
   readEntriesSync,
   appendEntryAtomicSync,
   writeEntriesAtomicSync,
   writeAtomicSync,
-  readEntries,
-  appendEntryAtomic,
-  writeEntriesAtomic,
   createBackupSync,
   withLockSync,
 } from '../storage/atomic-store.ts'
@@ -42,11 +35,8 @@ import {
 import {
   parseEntryBranches,
   parseEntrySummary,
-  stripEntrySummary,
   autoSummary,
   extractEntryDate,
-  BRANCH_TAG_RE,
-  SUMMARY_TAG_RE,
 } from '../storage/legacy-format.ts'
 import { desensitize } from './sanitize.ts'
 
@@ -279,7 +269,7 @@ export class MaestroMemoryStore {
    * So: keep a canonical tag as-is, move a trailing one to the header, and only
    * then fall back to generating one.
    */
-  private ensureAutoSummary(entry: string, target: MemoryTarget): string {
+  private ensureAutoSummary(entry: string): string {
     if (parseEntrySummary(entry) !== null) return entry
     const trailing = /\[summary:([^\]]*)\]\s*$/.exec(entry)
     if (trailing) {
@@ -442,9 +432,9 @@ export class MaestroMemoryStore {
         content = this.applySummaryTag(content, opts.summary)
       }
       content = this.ensureId(content)
-      content = this.ensureAutoSummary(content, t)
+      content = this.ensureAutoSummary(content)
     } else {
-      content = this.ensureAutoSummary(content, t)
+      content = this.ensureAutoSummary(content)
     }
     let file: string
     try {
@@ -516,7 +506,7 @@ export class MaestroMemoryStore {
         }
       }
       replacement = this.ensureDatePrefix(replacement)
-      replacement = this.ensureAutoSummary(replacement, t)
+      replacement = this.ensureAutoSummary(replacement)
       const idx = entries.indexOf(oldEntry)
       const next = [...entries]
       next[idx] = replacement
@@ -654,7 +644,7 @@ export class MaestroMemoryStore {
     return this.list('key', cwd, opts)
   }
 
-  listDaily(cwd?: string, date?: string, opts: ListOpts = {}): string[] {
+  listDaily(date?: string, opts: ListOpts = {}): string[] {
     // For backward compat, daily list without date uses today
     if (date) {
       const p = dailyPath(this.root(), date)
