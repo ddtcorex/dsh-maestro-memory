@@ -5,6 +5,7 @@
  */
 
 import { createHash } from 'node:crypto'
+import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
@@ -95,6 +96,19 @@ export function schemaPath(root: string): string {
 }
 export function journalPath(root: string): string {
   return join(maestroMetaDir(root), 'migration-journal.jsonl')
+}
+/**
+ * True when `<root>/.maestro-memory/write-block.json` marks the store as
+ * write-blocked. An unreadable flag file counts as blocked (fail closed).
+ */
+export function isWriteBlocked(root: string): boolean {
+  const blockPath = join(maestroMetaDir(root), 'write-block.json')
+  if (!existsSync(blockPath)) return false
+  try {
+    return JSON.parse(readFileSync(blockPath, 'utf8')).blocked === true
+  } catch {
+    return true
+  }
 }
 export function backupsDir(root: string): string {
   return join(maestroMetaDir(root), 'backups')

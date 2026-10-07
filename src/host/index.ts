@@ -13,9 +13,8 @@ import { buildFeedbackLine } from './memory/feedback.ts'
 import { TodoStore, resolveQuadrant } from './todo/store.ts'
 import { TODO_TARGETS, TODO_STATUSES } from './storage/legacy-format.ts'
 import { SuggestionQueue, enqueueSuggestion, approveSuggestions, rejectSuggestions } from './review/queue.ts'
-import { resolveMemoryRoot, suggestionsPath, globalArchivePath, userArchivePath, projectKeyArchivePath, todoArchivePath, maestroMetaDir } from './storage/layout.ts'
+import { resolveMemoryRoot, suggestionsPath, globalArchivePath, userArchivePath, projectKeyArchivePath, todoArchivePath, maestroMetaDir, isWriteBlocked } from './storage/layout.ts'
 import { appendEntryAtomicSync } from './storage/atomic-store.ts'
-import * as migration from './migration/service.ts'
 import { SyncService } from './sync/service.ts'
 import { RealGitAdapter } from './sync/git.ts'
 import { listSkillsSync, resolveDefaultMaestroSkillsDir } from './skills-browser.ts'
@@ -655,7 +654,7 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
           return { ok: false, error: `unknown todo action ${action}` }
         }
         case 'status': {
-          return { ok: true, queue: queue.read().length, blocked: migration.isWriteBlocked(root) }
+          return { ok: true, queue: queue.read().length, blocked: isWriteBlocked(root) }
         }
         case 'memory.repair': {
           // Preview-first: cleaning a store file is a write, so `dryRun` is the
@@ -690,26 +689,6 @@ export function apply(ctx: any, config: MaestroMemoryConfig = {}): void {
             }
           }
           return { ok: true, dryRun, plan }
-        }
-        case 'migration.inspect': {
-          const insp = await migration.inspect(root)
-          return { ...insp }
-        }
-        case 'migration.dryRun': {
-          const res = await migration.dryRun(root)
-          return { ...res }
-        }
-        case 'migration.run': {
-          // RPC run requires explicit apply flag in payload to enforce CLI's --apply semantics
-          if (payload?.apply !== true) {
-            return { ok: false, error: 'migration requires explicit apply=true (read-only by default)' }
-          }
-          const res = await migration.run(root)
-          return { ...res }
-        }
-        case 'migration.verify': {
-          const res = await migration.verify(root, payload?.runId)
-          return { ...res }
         }
         case 'sync.enable': {
           const cwd = String(payload?.cwd ?? '').trim()

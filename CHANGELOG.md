@@ -4,6 +4,17 @@ All notable changes to this project are documented in this file. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Removed
+
+- **The one-time legacy-layout migration.** In-place adoption from the old
+  `~/.dsh/memories` layout is no longer shipped: the `migration.*` RPC
+  endpoints, `scripts/migrate.mjs` and the migration service are gone.
+  Anyone still on the old layout must migrate with the last release that
+  contains it (2.2.1). The `write-block.json` guard and the `blocked` flag
+  in `status` are unchanged.
+
 ## [2.2.1] - 2026-10-07
 
 ### Fixed
