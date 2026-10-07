@@ -18,7 +18,7 @@
     "rewriteRelativeImportExtensions": true,
     "verbatimModuleSyntax": false,
     "noUnusedLocals": true,
-    "noUnusedParameters": false
+    "noUnusedParameters": true
   },
   "include": ["src/host/**/*.ts"],
   "exclude": ["src/client", "lib", "node_modules", ".client-build"]
