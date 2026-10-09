@@ -4,7 +4,7 @@ All notable changes to this project are documented in this file. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [3.0.0] - 2026-10-10
 
 ### Removed
 
@@ -21,6 +21,10 @@ All notable changes to this project are documented in this file. Format follows
   `allMetadataPaths` had no callers left after the migration removal.
 - **The duplicate `todayStamp` in the memory store.** It now imports the
   exported copy from the todo store.
+
+### Fixed
+
+- **Connection row injects webStartup.** DSH 0.2.1-alpha.x removed the webRuntime service; a connection entry still injecting it waits for a service that never mounts and dsh web never boots.
 
 ## [2.2.1] - 2026-10-07
 
