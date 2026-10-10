@@ -69,6 +69,6 @@ pnpm build    # tsc host + client && node scripts/build-client.mjs  -> lib/
 ## See Also
 
 - Local architecture audit: `docs/architecture.md`
-- The full spec (`<workspace-root>/docs/specs/dsh-maestro-memory.md`) and the sync design (`<workspace-root>/docs/SYNC-DESIGN.md`) live in the Maestro Harness coordination workspace.
+- The full spec (`<workspace-root>/docs/specs/2026-08-30-dsh-maestro-memory-spec.md`) and the sync design (`<workspace-root>/docs/SYNC-DESIGN.md`) live in the Maestro Harness coordination workspace.
 
 - **Always request approval before merge or release:** never merge a PR/MR or publish a release (`git tag`/`pnpm publish`/`gh release`) without an explicit human approval — request review (`gh pr ready` / `gh pr request-review` / ask in chat) and wait for `APPROVED`.

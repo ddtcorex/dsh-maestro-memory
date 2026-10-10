@@ -1,6 +1,6 @@
 # dsh-maestro-memory — Architecture (M0 seam audit)
 
-> **Canonical umbrella:** `docs/architecture.md` at the workspace root is the authoritative cross-repo map. This file is the **M0 seam audit** for `dsh-maestro-memory` specifically — it records the exact DSH surfaces this plugin owns and how they are injected. The workspace spec `<workspace-root>/docs/specs/dsh-maestro-memory.md` is the source-of-truth spec; `dsh-maestro-memory/README.md` is the operator guide.
+> **Canonical umbrella:** `docs/architecture.md` at the workspace root is the authoritative cross-repo map. This file is the **M0 seam audit** for `dsh-maestro-memory` specifically — it records the exact DSH surfaces this plugin owns and how they are injected. The workspace spec `<workspace-root>/docs/specs/2026-08-30-dsh-maestro-memory-spec.md` is the source-of-truth spec; `dsh-maestro-memory/README.md` is the operator guide.
 
 ## 1. Package & profile
 
@@ -52,7 +52,7 @@ tests/                     # vitest specs, one file per area (`pnpm test` report
 
 ## 6. Where to read next
 
-- **Spec (source of truth):** `<workspace-root>/docs/specs/dsh-maestro-memory.md` and this repo's `README.md`
+- **Spec (source of truth):** `<workspace-root>/docs/specs/2026-08-30-dsh-maestro-memory-spec.md` and this repo's `README.md`
 - **Plans:** transient, deleted from `<workspace-root>/docs/plans/` once a batch ships; none to link
 - **Sync design:** `<workspace-root>/docs/SYNC-DESIGN.md`
 - **Umbrella architecture:** `<workspace-root>/docs/architecture.md`
