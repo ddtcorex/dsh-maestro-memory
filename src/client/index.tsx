@@ -181,8 +181,20 @@ const MEM_CSS = `
 `
 
 const HEADER_BADGE_CSS = `
-.dshmem-header-badge { display:inline-flex; align-items:center; justify-content:center; min-width:16px; height:16px; padding:0 5px; margin-left:6px; border-radius:999px; background:var(--dsw-alias-state-error-primary,#d9534f); color:#fff; font-size:11px; font-weight:700; line-height:1; vertical-align:middle; animation:dshmem-blink 1.2s ease-in-out infinite; }
-@keyframes dshmem-blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+/* The single source of the badge is a span appended to the host's Memory tab
+   button. That button is display:block and wraps its own label in an inner
+   span, so a plain appended span is laid out as a block-level sibling: it
+   dropped onto a second line under the label, stretched the tab strip from
+   35px to 52px and landed on top of the active underline (measured on DSH Web
+   0.2.2-alpha.2). The plugin owns the row instead: pin the tab box to one
+   inline row so the badge sits beside the label at the tab's own height. The
+   !important is required because the host ships .…_tab { display:block } at
+   equal specificity and either stylesheet may come first. */
+[data-dshmem-memory-tab] { display:inline-flex !important; align-items:center !important; flex-wrap:nowrap !important; }
+.dshmem-header-badge { display:inline-flex; align-items:center; justify-content:center; flex:none; min-width:16px; height:16px; padding:0 5px; margin-left:6px; border-radius:999px; background:var(--dsw-alias-state-error-primary,#d9534f); color:#fff; font-size:11px; font-weight:700; line-height:1; vertical-align:middle; animation:dshmem-blink 1.2s ease-in-out infinite; }
+/* Pulse for unread suggestions, stopped at .6: below that the 11px count on the
+   16px red pill falls under the contrast floor and reads as a rendering bug. */
+@keyframes dshmem-blink { 0%,100%{opacity:1} 50%{opacity:.6} }
 `
 
 function sessionCwd(ctx: any): string {
