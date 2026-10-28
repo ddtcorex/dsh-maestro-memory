@@ -50,17 +50,29 @@ const MEM_CSS = `
 /* legacy contract for tests — inheritance via .dshmem */
 .dshmem { color: var(--dsw-alias-label-primary); font-size: 13px; }
 .dshmem button { font: inherit; cursor: pointer; transition: color .15s ease, background .15s ease, border-color .15s ease, opacity .15s ease; }
-.dshmem button:focus-visible { outline: 2px solid var(--dsw-alias-interactive-bg-active); outline-offset: 1px; }
+.dshmem button:focus-visible { outline: auto; outline-offset: 1px; }
 .dshmem input, .dshmem textarea, .dshmem select { font: inherit; color: var(--dsw-alias-label-primary); background: var(--dsw-alias-bg-layer-2); border: 1px solid var(--dsw-alias-border-l1); border-radius: 8px; }
 .memx { color: var(--dsw-alias-label-primary); font-size: 13px; line-height: 1.5; background: var(--dsw-alias-bg-base) !important; position: relative; z-index: 2; isolation: isolate; contain: paint; min-height: 100%; width: 100%; max-width: 100%; box-sizing: border-box; align-self: stretch; flex: 1 1 auto; pointer-events: auto; overflow-x: clip; overflow-y: auto; overflow-wrap: break-word; }
 .memx, .memx * { box-sizing: border-box; }
 .memx button { font: inherit; cursor: pointer; transition: color .15s ease, background .15s ease, border-color .15s ease, opacity .15s ease; }
 .memx button:active { transform: translateY(.5px); }
-.memx button:focus-visible { outline: 2px solid var(--dsw-alias-interactive-bg-active); outline-offset: 1px; }
+.memx button:focus-visible { outline: auto; outline-offset: 1px; }
 .memx input, .memx textarea, .memx select { font: inherit; color: var(--dsw-alias-label-primary); background: var(--dsw-alias-bg-layer-2); border: 1px solid var(--dsw-alias-border-l1); border-radius: 8px; }
-.memx input:focus, .memx textarea:focus, .memx select:focus { outline: none; border-color: var(--dsw-alias-border-l2); box-shadow: 0 0 0 2px var(--dsw-alias-interactive-bg-active); }
+/* Pointer focus has no platform ring, so the border carries the state. border-l1
+   is a 4-6% alpha hairline: swapping it for border-l2 (6-10%) was a no-op to the
+   eye, so the focused field uses label-secondary (5.80:1 light / 9.25:1 dark). */
+.memx input:focus, .memx textarea:focus, .memx select:focus { outline: none; border-color: var(--dsw-alias-label-secondary); }
+/* Keyboard focus paints the platform ring, the one the host itself draws on its
+   own controls (measured 4.25:1 light, 7.90:1 dark). The previous solid ring used
+   --dsw-alias-interactive-bg-active, a translucent SURFACE token that composites
+   to 1.20:1 light / 1.51:1 dark, i.e. it replaced a visible ring with an
+   invisible one. Must stay after the :focus rule that clears the outline. */
+.memx input:focus-visible, .memx textarea:focus-visible, .memx select:focus-visible,
+.dshmem input:focus-visible, .dshmem textarea:focus-visible, .dshmem select:focus-visible { outline: auto; outline-offset: 1px; }
+/* inside the search pill the wrapper already draws the ring */
+.memx-search input:focus-visible { outline: none; }
 .memx textarea { resize: vertical; }
-@media (prefers-reduced-motion: reduce) { .memx button, .memx-card, .dshmem-header-badge { transition: none !important; animation: none !important; } }
+@media (prefers-reduced-motion: reduce) { .memx button, .memx-card { transition: none !important; animation: none !important; } }
 
 /* header — refresh ngang hàng title (yêu cầu) */
 .memx-header { display:flex; align-items:center; gap:12px; flex-wrap:nowrap; margin-bottom:14px; }
@@ -72,7 +84,7 @@ const MEM_CSS = `
 .memx-search { display:flex; align-items:center; gap:6px; background:var(--dsw-alias-bg-layer-2); border:1px solid var(--dsw-alias-border-l1); border-radius:999px; padding:6px 10px; min-width:0; flex:1 1 160px; max-width:320px; }
 @media (max-width:1023px) { .memx-search { max-width:100%; flex-basis:100%; } }
 .memx-search input { border:none; background:transparent; padding:0; flex:1; min-width:0; box-shadow:none !important; }
-.memx-search:focus-within { border-color:var(--dsw-alias-border-l2); box-shadow:0 0 0 2px var(--dsw-alias-interactive-bg-active); }
+.memx-search:focus-within { border-color:var(--dsw-alias-label-secondary); box-shadow:0 0 0 2px var(--dsw-alias-label-secondary); }
 .memx-iconbtn { width:44px; height:44px; display:inline-flex; align-items:center; justify-content:center; border-radius:10px; border:1px solid var(--dsw-alias-border-l1); background:var(--dsw-alias-bg-layer-1); color:var(--dsw-alias-label-secondary); }
 .memx-iconbtn:hover { color:var(--dsw-alias-label-primary); border-color:var(--dsw-alias-border-l2); background:var(--dsw-alias-bg-layer-2); }
 .memx-iconbtn[aria-busy="true"] { opacity:.6; pointer-events:none; }
@@ -191,10 +203,20 @@ const HEADER_BADGE_CSS = `
    !important is required because the host ships .…_tab { display:block } at
    equal specificity and either stylesheet may come first. */
 [data-dshmem-memory-tab] { display:inline-flex !important; align-items:center !important; flex-wrap:nowrap !important; }
-.dshmem-header-badge { display:inline-flex; align-items:center; justify-content:center; flex:none; min-width:16px; height:16px; padding:0 5px; margin-left:6px; border-radius:999px; background:var(--dsw-alias-state-error-primary,#d9534f); color:#fff; font-size:11px; font-weight:700; line-height:1; vertical-align:middle; animation:dshmem-blink 1.2s ease-in-out infinite; }
+.dshmem-header-badge { display:inline-flex; align-items:center; justify-content:center; flex:none; min-width:16px; height:16px; padding:0 5px; margin-left:6px; border-radius:999px; background:var(--dsw-alias-state-error-primary,#d9534f); background:color-mix(in srgb, var(--dsw-alias-state-error-primary) 78%, #000); color:#fff; font-size:11px; font-weight:700; line-height:1; vertical-align:middle; animation:dshmem-blink 1.2s ease-in-out infinite; }
 /* Pulse for unread suggestions, stopped at .6: below that the 11px count on the
-   16px red pill falls under the contrast floor and reads as a rendering bug. */
+   16px red pill falls under the contrast floor and reads as a rendering bug.
+   The fill is darkened 22% toward black because #fff on the raw error token is
+   3.29:1 in dark theme (#f25a5a) and needs 4.5:1 at 11px/700; the mix lands at
+   ~5.0:1 dark and ~6.7:1 light, and the plain token declaration above stays as
+   the fallback for engines without color-mix. */
 @keyframes dshmem-blink { 0%,100%{opacity:1} 50%{opacity:.6} }
+/* This stylesheet lives in <head> for the whole session, so the badge keeps its
+   reduced-motion veto even when the Memory view is not the active section (the
+   panel stylesheet is only mounted while it is). */
+@media (prefers-reduced-motion: reduce) {
+  .dshmem-header-badge { animation: none !important; }
+}
 `
 
 function sessionCwd(ctx: any): string {
