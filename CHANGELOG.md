@@ -4,6 +4,67 @@ All notable changes to this project are documented in this file. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.1] - 2026-10-29
+
+Memory view fixes from the 2026-10-28 design audit (19 findings measured live on
+DSH Web 0.2.2-alpha.2; report at
+`maestro-harness/docs/reports/2026-10-28-dsh-maestro-memory-design-audit.md`).
+
+### Fixed
+
+- **The queue badge on the Memory tab.** The count is a span appended to the
+  host's tab button, which is `display: block` with its label in an inner span,
+  so the badge dropped onto a second line, stretched the tab strip from 35px to
+  52px and landed on the active underline. The tab box is pinned to one inline
+  row now.
+- **The focus ring.** Keyboard focus was painted with
+  `--dsw-alias-interactive-bg-active`, a translucent surface token that
+  composites to 1.20:1 in light theme and 1.51:1 in dark, so the panel replaced
+  the host's visible ring with an invisible one. It delegates to the platform
+  ring (17.45:1 dark, 18.90:1 light) and focused fields keep a label-secondary
+  border (5.80:1 / 9.25:1).
+- **The badge count.** White on the raw error token measured 3.29:1 in dark; the
+  fill is mixed 22% toward black (5.09:1 dark, 6.75:1 light) with the plain
+  token kept as a fallback. Its reduced-motion veto moved into the stylesheet
+  that stays mounted for the whole session instead of the panel one.
+- **The Health section reported numbers it did not have.** A hardcoded
+  "1.5 avg / session" sat beside real zeroes, and an empty project rendered as a
+  green "100.0% PASS" because the host answers coverage 100 for `total === 0`.
+  Coverage now reports `n/a` there, and the value sits on a tinted chip with
+  label-primary text (the raw state colours measured 2.28:1 and 2.15:1 as text
+  on the light surface).
+- **Silent action results.** Only one section published a live region and the
+  other four rendered failures as muted grey notes. One `MemStatus` component
+  with `role=status` now serves all five sections and failures use the error
+  colour (4.77:1 dark, 4.83:1 light).
+- **The Skills section printed its empty message twice**, and listed absolute
+  filesystem paths in a 12px line; paths collapse to their last two segments
+  with the full path in `title`.
+- **The mobile section rail.** It was a 517px scroller inside a 303px box with
+  the scrollbar hidden, so Skills and Health were off-screen with no affordance.
+  Below 1024px it is a wrapping grid, pills/selects/search hold the 44px touch
+  floor, empty states are 520px notes instead of full-width dashed slabs, the
+  todo composer starts collapsed, and queue cards show their reason once with
+  the edit box behind a toggle.
+- **Light theme had no surface hierarchy.** `bg-base`, `bg-layer-1` and
+  `bg-layer-2` all resolve to `#fff` there, so cards, forms and empty states had
+  no boundary; they pair `border-l2` with a soft shadow now.
+- **Unscoped host-chrome rules.** The panel stylesheet restyled every
+  conversation view as soon as it mounted; only the `:has(.memx)` scoped set
+  remains.
+
+### Changed
+
+- **Section tabs behave like tabs.** Roving tabindex plus Arrow/Home/End keys,
+  and the panel itself is focusable.
+- **The badge count no longer becomes part of the tab's name.** It is
+  `aria-hidden` with an `aria-describedby` description ("N pending
+  suggestions"), so the tab reads as "Memory".
+- **One refresh per section.** The header icon that only polled the queue count
+  is gone; Health's refresh moved from the bottom into its toolbar.
+- **Tests.** New suites for the badge placement, the a11y tokens, the audit
+  follow-ups, and the new `src/client/format.ts` helpers; 428 tests in total.
+
 ## [3.0.0] - 2026-10-10
 
 ### Removed
