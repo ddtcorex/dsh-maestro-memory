@@ -3,6 +3,7 @@
  * Uses maestro-design: Minimalism + Bento Grid, DSH tokens only, desktop+mobile.
  */
 import * as React from 'react'
+import { coverageSummary, seriesText, shortPath } from './format.ts'
 
 export const inject = ['slots', 'sessions', 'connection'] as const
 
@@ -41,26 +42,54 @@ const MEM_CSS = `
 [data-conversation-scroll]:has(.memx) [class*="viewArea"] > [data-slot="conversation.view"] { display: flex !important; flex-direction: column !important; flex: 1 1 auto !important; min-height: 0 !important; min-width: 0 !important; width: 100% !important; max-width: 100% !important; overflow: hidden !important; background: var(--dsw-alias-bg-base) !important; pointer-events: auto !important; }
 [data-conversation-scroll]:has(.memx) .memx { flex: 1 1 auto !important; min-height: 0 !important; overflow-y: auto !important; pointer-events: auto !important; overscroll-behavior: contain !important; }
 [class*="body"]:has(.memx) [data-width-handle], [data-conversation-scroll]:has(.memx) ~ [data-width-handle], body:has(.memx) [data-width-handle], [class*="root"]:has(.memx) [data-width-handle] { display: none !important; pointer-events: none !important; }
-[class*="viewArea"] { background: var(--dsw-alias-bg-base) !important; isolation: isolate; contain: paint; position: relative; z-index: 1; flex: 1 1 auto; min-height: 100%; width: 100%; max-width: 100%; overflow: hidden; }
-[data-slot="conversation.view"] { display: block !important; background: var(--dsw-alias-bg-base) !important; isolation: isolate; contain: paint; position: relative; z-index: 1; flex: 1 1 auto; min-height: 0; min-width: 0; width: 100%; max-width: 100%; pointer-events: auto; }
-[data-slot="conversation.session"] { background: var(--dsw-alias-bg-base); isolation: isolate; contain: paint; }
+/* The unscoped copies of these two rules used to restyle every conversation
+   view as soon as the plugin stylesheet was mounted. Only the :has(.memx) set
+   above is needed, so the global versions are gone (audit F19). */
 [data-slot="conversation.view"] > .memx,
 [class*="viewArea"] > .memx,
 [class*="viewArea"] > [data-slot="conversation.view"] > .memx { flex: 1 1 auto; min-width: 0; max-width: 100%; }
 /* legacy contract for tests — inheritance via .dshmem */
 .dshmem { color: var(--dsw-alias-label-primary); font-size: 13px; }
 .dshmem button { font: inherit; cursor: pointer; transition: color .15s ease, background .15s ease, border-color .15s ease, opacity .15s ease; }
-.dshmem button:focus-visible { outline: 2px solid var(--dsw-alias-interactive-bg-active); outline-offset: 1px; }
+.dshmem button:focus-visible { outline: auto; outline-offset: 1px; }
 .dshmem input, .dshmem textarea, .dshmem select { font: inherit; color: var(--dsw-alias-label-primary); background: var(--dsw-alias-bg-layer-2); border: 1px solid var(--dsw-alias-border-l1); border-radius: 8px; }
 .memx { color: var(--dsw-alias-label-primary); font-size: 13px; line-height: 1.5; background: var(--dsw-alias-bg-base) !important; position: relative; z-index: 2; isolation: isolate; contain: paint; min-height: 100%; width: 100%; max-width: 100%; box-sizing: border-box; align-self: stretch; flex: 1 1 auto; pointer-events: auto; overflow-x: clip; overflow-y: auto; overflow-wrap: break-word; }
 .memx, .memx * { box-sizing: border-box; }
 .memx button { font: inherit; cursor: pointer; transition: color .15s ease, background .15s ease, border-color .15s ease, opacity .15s ease; }
 .memx button:active { transform: translateY(.5px); }
-.memx button:focus-visible { outline: 2px solid var(--dsw-alias-interactive-bg-active); outline-offset: 1px; }
+.memx button:focus-visible { outline: auto; outline-offset: 1px; }
 .memx input, .memx textarea, .memx select { font: inherit; color: var(--dsw-alias-label-primary); background: var(--dsw-alias-bg-layer-2); border: 1px solid var(--dsw-alias-border-l1); border-radius: 8px; }
-.memx input:focus, .memx textarea:focus, .memx select:focus { outline: none; border-color: var(--dsw-alias-border-l2); box-shadow: 0 0 0 2px var(--dsw-alias-interactive-bg-active); }
+/* Pointer focus has no platform ring, so the border carries the state. border-l1
+   is a 4-6% alpha hairline: swapping it for border-l2 (6-10%) was a no-op to the
+   eye, so the focused field uses label-secondary (5.80:1 light / 9.25:1 dark). */
+.memx input:focus, .memx textarea:focus, .memx select:focus { outline: none; border-color: var(--dsw-alias-label-secondary); }
+/* Keyboard focus paints the platform ring, the one the host itself draws on its
+   own controls (measured 4.25:1 light, 7.90:1 dark). The previous solid ring used
+   --dsw-alias-interactive-bg-active, a translucent SURFACE token that composites
+   to 1.20:1 light / 1.51:1 dark, i.e. it replaced a visible ring with an
+   invisible one. Must stay after the :focus rule that clears the outline. */
+.memx input:focus-visible, .memx textarea:focus-visible, .memx select:focus-visible,
+.dshmem input:focus-visible, .dshmem textarea:focus-visible, .dshmem select:focus-visible { outline: auto; outline-offset: 1px; }
+/* inside the search pill the wrapper already draws the ring */
+.memx-search input:focus-visible { outline: none; }
 .memx textarea { resize: vertical; }
-@media (prefers-reduced-motion: reduce) { .memx button, .memx-card, .dshmem-header-badge { transition: none !important; animation: none !important; } }
+@media (prefers-reduced-motion: reduce) { .memx button, .memx-card { transition: none !important; animation: none !important; } }
+
+/* status line: role=status stays mounted so assistive tech registers the region
+   before it has content; the :empty rule above takes it out of flow. Failures
+   keep the same polite region and carry their meaning in the text plus the error
+   colour, because swapping role/aria-live on a live node is not reliably
+   announced. Error colour on the panel surface measures 4.77:1 dark, 4.83:1
+   light. */
+.memx-status-error { color: var(--dsw-alias-state-error-primary); }
+/* Health metrics: the value sits on a tinted chip with label-primary text.
+   Painting the raw state colours as text measured 2.28:1 (success) and 2.15:1
+   (warn) on the light surface, under the 3:1 large-text floor. */
+.memx-stat-value { display:inline-flex; align-items:center; gap:6px; padding:2px 10px; border-radius:999px; background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 16%, transparent); color: var(--dsw-alias-label-primary); }
+.memx-stat-value[data-state="fail"] { background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 16%, transparent); }
+.memx-stat-value[data-state="unknown"] { background: color-mix(in srgb, var(--dsw-alias-label-primary) 8%, transparent); }
+.memx-grid-3 { display:grid; gap:10px; width:100%; max-width:100%; min-width:0; }
+@media (min-width: 640px) { .memx-grid-3 { grid-template-columns: repeat(3, minmax(0,1fr)); } }
 
 /* header — refresh ngang hàng title (yêu cầu) */
 .memx-header { display:flex; align-items:center; gap:12px; flex-wrap:nowrap; margin-bottom:14px; }
@@ -72,10 +101,16 @@ const MEM_CSS = `
 .memx-search { display:flex; align-items:center; gap:6px; background:var(--dsw-alias-bg-layer-2); border:1px solid var(--dsw-alias-border-l1); border-radius:999px; padding:6px 10px; min-width:0; flex:1 1 160px; max-width:320px; }
 @media (max-width:1023px) { .memx-search { max-width:100%; flex-basis:100%; } }
 .memx-search input { border:none; background:transparent; padding:0; flex:1; min-width:0; box-shadow:none !important; }
-.memx-search:focus-within { border-color:var(--dsw-alias-border-l2); box-shadow:0 0 0 2px var(--dsw-alias-interactive-bg-active); }
+.memx-search:focus-within { border-color:var(--dsw-alias-label-secondary); box-shadow:0 0 0 2px var(--dsw-alias-label-secondary); }
 .memx-iconbtn { width:44px; height:44px; display:inline-flex; align-items:center; justify-content:center; border-radius:10px; border:1px solid var(--dsw-alias-border-l1); background:var(--dsw-alias-bg-layer-1); color:var(--dsw-alias-label-secondary); }
 .memx-iconbtn:hover { color:var(--dsw-alias-label-primary); border-color:var(--dsw-alias-border-l2); background:var(--dsw-alias-bg-layer-2); }
 .memx-iconbtn[aria-busy="true"] { opacity:.6; pointer-events:none; }
+
+/* Type scale: the panel runs at 13px body while the shell renders conversation
+   text at 16px, which is the most visible difference between Memory and Chat
+   (audit F13). Kept deliberately: this is a dense CRUD surface, not prose, and
+   the 11px kicker/meta sizes below are measured against that body size. Revisit
+   only together with the whole panel's spacing. */
 
 /* layout — align breakpoint with dsh-maestro-mobile (1023px) */
 .memx-layout { display:grid; gap:14px; width:100%; max-width:100%; min-width:0; }
@@ -125,7 +160,7 @@ const MEM_CSS = `
 .memx-dim-grid { display:grid; gap:8px; width:100%; max-width:100%; min-width:0; grid-template-columns: repeat(2, minmax(0,1fr)); }
 @media (min-width: 640px) { .memx-dim-grid { grid-template-columns: repeat(3, minmax(0,1fr)); } }
 @media (min-width: 1024px) { .memx-dim-grid { grid-template-columns: repeat(6, minmax(0,1fr)); } }
-.memx-dim-card { border:1px solid var(--dsw-alias-border-l1); border-radius:10px; background:var(--dsw-alias-bg-layer-2); padding:10px 8px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; min-height:64px; text-align:center; min-width:0; }
+.memx-dim-card { border:1px solid var(--dsw-alias-border-l2); border-radius:10px; background:var(--dsw-alias-bg-layer-2); padding:10px 8px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; min-height:64px; text-align:center; min-width:0; }
 .memx-dim-card .memx-kicker { font-size:11px; }
 .memx-dim-val { font-size:18px; font-weight:700; line-height:1; }
 .memx-dim-composite { background:var(--dsw-alias-interactive-bg-active); border-color:var(--dsw-alias-border-l2); }
@@ -135,7 +170,13 @@ const MEM_CSS = `
 .memx-dim-title { font-weight:600; color:var(--dsw-alias-label-primary); font-size:13px; }
 .memx-dim-formula { font-size:11px; color:var(--dsw-alias-label-secondary); }
 @media (max-width: 480px) { .memx-dim-head { flex-direction:column; align-items:flex-start; gap:2px; } }
-.memx-card { border:1px solid var(--dsw-alias-border-l1); border-radius:12px; background:var(--dsw-alias-bg-layer-1); padding:12px; display:flex; flex-direction:column; gap:8px; min-width:0; max-width:100%; overflow:hidden; }
+.memx-card { border:1px solid var(--dsw-alias-border-l2); border-radius:12px; background:var(--dsw-alias-bg-layer-1); padding:12px; display:flex; flex-direction:column; gap:8px; min-width:0; max-width:100%; overflow:hidden; }
+/* Light theme resolves bg-base, bg-layer-1 and bg-layer-2 all to #fff, and
+   border-l1 is a 4% black hairline (1.09:1), so cards, forms and empty states
+   had no visible boundary at all (audit F7). A soft shadow mixed from
+   label-primary costs nothing in dark theme (it is invisible there) and
+   restores the grid in light theme. */
+.memx-card, .memx-form, .memx-empty, .memx-dim-card { box-shadow: 0 1px 2px color-mix(in srgb, var(--dsw-alias-label-primary) 8%, transparent); }
 .memx-card:hover { border-color:var(--dsw-alias-border-l2); }
 .memx-cardhead { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
 .memx-kicker { text-transform:uppercase; letter-spacing:.04em; font-size:11px; color:var(--dsw-alias-label-secondary); font-weight:600; }
@@ -146,17 +187,35 @@ const MEM_CSS = `
 .memx-pre { white-space:pre-wrap; word-break:break-word; }
 .memx-pre-sm { white-space:pre-wrap; word-break:break-word; font-size:12px; }
 .memx-chip { display:inline-flex; align-items:center; gap:4px; padding:3px 8px; border-radius:999px; border:1px solid var(--dsw-alias-border-l1); background:var(--dsw-alias-bg-layer-2); font-size:11px; color:var(--dsw-alias-label-secondary); }
-.memx-empty { border:1px dashed var(--dsw-alias-border-l2); border-radius:12px; padding:24px; text-align:center; color:var(--dsw-alias-label-secondary); background:var(--dsw-alias-bg-layer-1); }
+/* Empty states are notes, not containers: a 900px-wide dashed slab with two
+   centred lines read as a panel that failed to load (audit F12). */
+.memx-empty { border:1px dashed var(--dsw-alias-border-l2); border-radius:12px; padding:14px 16px; text-align:left; color:var(--dsw-alias-label-secondary); background:var(--dsw-alias-bg-layer-1); max-width:520px; }
 .memx-stat { text-align:left; }
 .memx-statval { font-size:20px; font-weight:800; letter-spacing:-.02em; }
 .memx-actions { display:flex; gap:8px; flex-wrap:wrap; }
 @media (max-width: 639px) { .memx-actions button { flex:1; min-width:0; } }
 
 /* forms inline */
-.memx-form { border:1px solid var(--dsw-alias-border-l1); border-radius:12px; background:var(--dsw-alias-bg-layer-1); padding:12px; display:flex; flex-direction:column; gap:10px; min-width:0; max-width:100%; }
+.memx-form { border:1px solid var(--dsw-alias-border-l2); border-radius:12px; background:var(--dsw-alias-bg-layer-1); padding:12px; display:flex; flex-direction:column; gap:10px; min-width:0; max-width:100%; }
 .memx-formrow { display:flex; gap:8px; flex-wrap:wrap; min-width:0; }
 .memx-formrow > * { flex:1 1 0; min-width:120px; max-width:100%; }
-@media (max-width:1023px) { .memx { padding:12px 12px calc(16px + env(safe-area-inset-bottom,0px)) !important; } .memx-layout { gap:12px; grid-template-columns:1fr !important; } .memx-formrow > *{ min-width:0; } }
+@media (max-width:1023px) {
+  .memx { padding:12px 12px calc(16px + env(safe-area-inset-bottom,0px)) !important; }
+  .memx-layout { gap:12px; grid-template-columns:1fr !important; }
+  .memx-formrow > * { min-width:0; flex:1 1 100%; }
+  /* The rail used to be a 517px horizontal scroller inside 303px with its
+     scrollbar hidden, so Skills and Health were off-screen with no affordance
+     (audit F1). Wrap it into a grid instead and drop the "5 tracks" counter,
+     which only cost rail width. */
+  .memx-nav { display:grid; grid-template-columns:repeat(auto-fit, minmax(84px, 1fr)); gap:8px; overflow:visible; }
+  .memx-navitem { min-width:0; }
+  .memx-navcount { display:none; }
+  /* 44px touch floor: pills measured 33.5px, form selects 23.5px, checkboxes
+     13x13 (audit F9). */
+  .memx-pill, .memx-select, .memx-search { min-height:44px; }
+  .memx-search input { height:auto; }
+  .memx-form label { min-height:44px; }
+}
 @media (max-width:480px) { .memx-field { flex-direction:column; align-items:stretch; } .memx-input { flex-basis:auto; width:100%; max-width:100%; } }
 @media (min-width:1440px) { .memx { max-width:1280px; margin:0 auto; } }
 
@@ -181,8 +240,31 @@ const MEM_CSS = `
 `
 
 const HEADER_BADGE_CSS = `
-.dshmem-header-badge { display:inline-flex; align-items:center; justify-content:center; min-width:16px; height:16px; padding:0 5px; margin-left:6px; border-radius:999px; background:var(--dsw-alias-state-error-primary,#d9534f); color:#fff; font-size:11px; font-weight:700; line-height:1; vertical-align:middle; animation:dshmem-blink 1.2s ease-in-out infinite; }
-@keyframes dshmem-blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+/* The single source of the badge is a span appended to the host's Memory tab
+   button. That button is display:block and wraps its own label in an inner
+   span, so a plain appended span is laid out as a block-level sibling: it
+   dropped onto a second line under the label, stretched the tab strip from
+   35px to 52px and landed on top of the active underline (measured on DSH Web
+   0.2.2-alpha.2). The plugin owns the row instead: pin the tab box to one
+   inline row so the badge sits beside the label at the tab's own height. The
+   !important is required because the host ships .…_tab { display:block } at
+   equal specificity and either stylesheet may come first. */
+[data-dshmem-memory-tab] { display:inline-flex !important; align-items:center !important; flex-wrap:nowrap !important; }
+.dshmem-header-badge { display:inline-flex; align-items:center; justify-content:center; flex:none; min-width:16px; height:16px; padding:0 5px; margin-left:6px; border-radius:999px; background:var(--dsw-alias-state-error-primary,#d9534f); background:color-mix(in srgb, var(--dsw-alias-state-error-primary) 78%, #000); color:#fff; font-size:11px; font-weight:700; line-height:1; vertical-align:middle; animation:dshmem-blink 1.2s ease-in-out infinite; }
+/* Pulse for unread suggestions, stopped at .6: below that the 11px count on the
+   16px red pill falls under the contrast floor and reads as a rendering bug.
+   The fill is darkened 22% toward black because #fff on the raw error token is
+   3.29:1 in dark theme (#f25a5a) and needs 4.5:1 at 11px/700; the mix lands at
+   ~5.0:1 dark and ~6.7:1 light, and the plain token declaration above stays as
+   the fallback for engines without color-mix. */
+@keyframes dshmem-blink { 0%,100%{opacity:1} 50%{opacity:.6} }
+.dshmem-sr-only { position:absolute; width:1px; height:1px; margin:0; padding:0; border:0; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+/* This stylesheet lives in <head> for the whole session, so the badge keeps its
+   reduced-motion veto even when the Memory view is not the active section (the
+   panel stylesheet is only mounted while it is). */
+@media (prefers-reduced-motion: reduce) {
+  .dshmem-header-badge { animation: none !important; }
+}
 `
 
 function sessionCwd(ctx: any): string {
@@ -224,31 +306,49 @@ const ICO = {
   spark: 'M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5z',
 }
 
+// ── Status line ────────────────────────────────────────────────────
+// Shared by all five sections. Before this, only the Memory section published a
+// live region and the other four rendered failures as muted grey notes, so an
+// approve or a failed add was silent to assistive tech (audit F6).
+function MemStatus({ text, tone }: { text: string; tone?: 'info' | 'error' }): React.ReactElement {
+  const error = tone === 'error'
+  return React.createElement('div', {
+    className: error ? 'memx-status memx-status-error' : 'memx-muted memx-status',
+    role: 'status',
+    'aria-live': 'polite',
+    style: { whiteSpace: 'pre-wrap' },
+  }, text)
+}
+
 // ── Review ─────────────────────────────────────────────────────────
 function ReviewQueueView({ ctx, onPendingChange }: { ctx:any; onPendingChange?:(n:number)=>void }) : React.ReactElement {
   const rpc = useRpc(ctx)
   const [entries,setEntries]=React.useState<any[]>([])
   const [loading,setLoading]=React.useState(true)
   const [edits,setEdits]=React.useState<Record<number,string>>({})
+  const [editOpen,setEditOpen]=React.useState<Record<number,boolean>>({})
   const [msg,setMsg]=React.useState('')
+  const [msgErr,setMsgErr]=React.useState(false)
+  const ok=React.useCallback((t:string)=>{ setMsgErr(false); setMsg(t) },[])
+  const bad=React.useCallback((t:string)=>{ setMsgErr(true); setMsg(t) },[])
   const [q,setQ]=React.useState('')
 
   const load = React.useCallback(async()=>{
     setLoading(true)
     try{ const res:any=await rpc('queue.list',{}); const list=Array.isArray(res?.entries)?res.entries:[]; setEntries(list); onPendingChange?.(list.length) }
-    catch(e:any){ setMsg(`load failed: ${e?.message??String(e)}`) } finally{ setLoading(false) }
+    catch(e:any){ bad(`load failed: ${e?.message??String(e)}`) } finally{ setLoading(false) }
   },[rpc,onPendingChange])
   React.useEffect(()=>{ load() },[load])
 
   const decide = React.useCallback(async(action:'approve'|'reject'|'archive', index:number)=>{
-    setMsg('')
+    ok('')
     const payload:any={ action, indices:[index] }
     if(action==='approve' && edits[index]!==undefined && edits[index].trim()!=='') payload.edits={ [String(index)]: edits[index] }
     if(action==='approve'){
       try { const snap:any=(ctx as any)?.sessions?.list?.getSnapshot?.(); const cur=snap?.current as string|undefined; const cwd = cur ? (snap?.byId?.[cur]?.cwd as string) ?? '' : ''; if(cwd) payload.cwd = cwd } catch {}
     }
-    try{ const res:any=await rpc('queue.decide',payload); if(res?.ok){ setMsg(res.lines?res.lines.join('; '):`${action} ok`); await load() } else setMsg(`failed: ${res?.error??'unknown'}`) }
-    catch(e:any){ setMsg(`error: ${e?.message??String(e)}`) }
+    try{ const res:any=await rpc('queue.decide',payload); if(res?.ok){ ok(res.lines?res.lines.join('; '):`${action} ok`); await load() } else bad(`failed: ${res?.error??'unknown'}`) }
+    catch(e:any){ bad(`error: ${e?.message??String(e)}`) }
   },[rpc,edits,load,ctx])
 
   const filtered = React.useMemo(()=>{
@@ -274,20 +374,20 @@ function ReviewQueueView({ ctx, onPendingChange }: { ctx:any; onPendingChange?:(
         return React.createElement('div',{key:number, className:'memx-card'},
           React.createElement('div',{className:'memx-cardhead'},
             React.createElement('span',{className:'memx-chip'}, `#${number} · ${e.target}`),
-            e.reason ? React.createElement('span',{className:'memx-sm'}, e.reason.slice(0,80)) : null,
           ),
           React.createElement('div',{className:'memx-pre'}, e.content),
           e.reason ? React.createElement('div',{className:'memx-sm'}, `Reason: ${e.reason}`) : null,
-          React.createElement('textarea',{value:edits[number]??'', placeholder:'Edit content before approve (optional)', onChange:(ev:any)=>setEdits(prev=>({...prev,[number]:ev.target.value})), className:'memx-textarea', 'aria-label':'Edit before approve', rows:2}),
+          editOpen[number] ? React.createElement('textarea',{value:edits[number]??'', placeholder:'Edit content before approve (optional)', onChange:(ev:any)=>setEdits(prev=>({...prev,[number]:ev.target.value})), className:'memx-textarea', 'aria-label':'Edit before approve', rows:2}) : null,
           React.createElement('div',{className:'memx-actions'},
             React.createElement('button',{onClick:()=>decide('approve',number), 'data-testid':`approve-${number}`, className:'memx-btn memx-btn-primary'}, 'Approve'),
+            React.createElement('button',{onClick:()=>setEditOpen(prev=>({...prev,[number]:!prev[number]})), 'aria-expanded': editOpen[number]===true, className:'memx-btn memx-btn-ghost', 'data-testid':`edit-${number}`}, editOpen[number]?'Close edit':'Edit'),
             React.createElement('button',{onClick:()=>decide('reject',number), 'data-testid':`reject-${number}`, className:'memx-btn'}, 'Reject'),
             React.createElement('button',{onClick:()=>decide('archive',number), 'data-testid':`archive-${number}`, className:'memx-btn'}, 'Archive'),
           ),
         )
       })
     ),
-    msg ? React.createElement('div',{className:'memx-muted', style:{whiteSpace:'pre-wrap'}}, msg) : null,
+    React.createElement(MemStatus,{text:msg, tone: msgErr?'error':'info'}),
   )
 }
 
@@ -297,6 +397,9 @@ function TodosView({ ctx }: {ctx:any}): React.ReactElement {
   const [items,setItems]=React.useState<any[]>([])
   const [loading,setLoading]=React.useState(true)
   const [msg,setMsg]=React.useState('')
+  const [msgErr,setMsgErr]=React.useState(false)
+  const ok=React.useCallback((t:string)=>{ setMsgErr(false); setMsg(t) },[])
+  const bad=React.useCallback((t:string)=>{ setMsgErr(true); setMsg(t) },[])
   const [target,setTarget]=React.useState<string>('all')
   const [showAll,setShowAll]=React.useState(false)
   const [showPast,setShowPast]=React.useState(false)
@@ -307,7 +410,7 @@ function TodosView({ ctx }: {ctx:any}): React.ReactElement {
   const [draftDue,setDraftDue]=React.useState('')
   const [draftQuadrant,setDraftQuadrant]=React.useState<string>('')
   const [draftCat,setDraftCat]=React.useState('')
-  const [openAdd,setOpenAdd]=React.useState(true)
+  const [openAdd,setOpenAdd]=React.useState(false)
   const [editId,setEditId]=React.useState<string|null>(null)
   const [editContent,setEditContent]=React.useState('')
   const [editDue,setEditDue]=React.useState('')
@@ -316,12 +419,12 @@ function TodosView({ ctx }: {ctx:any}): React.ReactElement {
   const [editCat,setEditCat]=React.useState('')
 
   const load=React.useCallback(async()=>{
-    setLoading(true); setMsg('')
+    setLoading(true); ok('')
     try{
       const res:any=await rpc('todo.list',{ target: target!=='all'?target:undefined, opts:{ all:showAll, past:showPast, expired:showExpired } })
       setItems(Array.isArray(res?.items)?res.items:[])
-      if(res?.hint) setMsg(res.hint)
-    } catch(e:any){ setMsg(`load failed: ${e?.message??String(e)}`) } finally{ setLoading(false) }
+      if(res?.hint) ok(res.hint)
+    } catch(e:any){ bad(`load failed: ${e?.message??String(e)}`) } finally{ setLoading(false) }
   },[rpc,target,showAll,showPast,showExpired])
   React.useEffect(()=>{ load() },[load])
 
@@ -331,23 +434,23 @@ function TodosView({ ctx }: {ctx:any}): React.ReactElement {
   },[items,q])
 
   const addTodo=React.useCallback(async()=>{
-    const content=draftContent.trim(); if(!content){ setMsg('content required'); return }
-    setMsg('')
+    const content=draftContent.trim(); if(!content){ bad('content required'); return }
+    ok('')
     try{
       const res:any=await rpc('todo.mutate',{ action:'add', target:draftTarget, content, due:draftDue||undefined, quadrant:draftQuadrant||undefined, cat:draftCat||undefined })
-      if(res?.ok){ setDraftContent(''); setDraftDue(''); setDraftQuadrant(''); setDraftCat(''); setMsg(`added (id: ${res.id})`); await load() }
-      else setMsg(`add failed: ${res?.message??res?.error??'unknown'}`)
-    } catch(e:any){ setMsg(`error: ${e?.message??String(e)}`) }
+      if(res?.ok){ setDraftContent(''); setDraftDue(''); setDraftQuadrant(''); setDraftCat(''); ok(`added (id: ${res.id})`); await load() }
+      else bad(`add failed: ${res?.message??res?.error??'unknown'}`)
+    } catch(e:any){ bad(`error: ${e?.message??String(e)}`) }
   },[rpc,draftContent,draftTarget,draftDue,draftQuadrant,draftCat,load])
 
   const doneTodo=React.useCallback(async(item:any)=>{
-    try{ const res:any=await rpc('todo.mutate',{action:'done', target:item.target, id:item.id}); if(res?.ok){ setMsg(res.message??'done'); await load() } else setMsg(`done failed: ${res?.message??res?.error}`) } catch(e:any){ setMsg(`error: ${e?.message??String(e)}`) }
+    try{ const res:any=await rpc('todo.mutate',{action:'done', target:item.target, id:item.id}); if(res?.ok){ ok(res.message??'done'); await load() } else bad(`done failed: ${res?.message??res?.error}`) } catch(e:any){ bad(`error: ${e?.message??String(e)}`) }
   },[rpc,load])
   const undoTodo=React.useCallback(async(item:any)=>{
-    try{ const res:any=await rpc('todo.mutate',{action:'update', target:item.target, id:item.id, status:'pending'}); if(res?.ok){ setMsg(res.message??'undone'); await load() } else setMsg(`undo failed: ${res?.message??res?.error}`) } catch(e:any){ setMsg(`error: ${e?.message??String(e)}`) }
+    try{ const res:any=await rpc('todo.mutate',{action:'update', target:item.target, id:item.id, status:'pending'}); if(res?.ok){ ok(res.message??'undone'); await load() } else bad(`undo failed: ${res?.message??res?.error}`) } catch(e:any){ bad(`error: ${e?.message??String(e)}`) }
   },[rpc,load])
   const removeTodo=React.useCallback(async(item:any)=>{
-    try{ const res:any=await rpc('todo.mutate',{action:'remove', target:item.target, id:item.id}); if(res?.ok){ setMsg(res.message??'removed'); await load() } else setMsg(`remove failed: ${res?.message??res?.error}`) } catch(e:any){ setMsg(`error: ${e?.message??String(e)}`) }
+    try{ const res:any=await rpc('todo.mutate',{action:'remove', target:item.target, id:item.id}); if(res?.ok){ ok(res.message??'removed'); await load() } else bad(`remove failed: ${res?.message??res?.error}`) } catch(e:any){ bad(`error: ${e?.message??String(e)}`) }
   },[rpc,load])
   const startEdit=(item:any)=>{ setEditId(item.id); setEditContent(item.text??''); setEditDue(item.due??''); setEditQuadrant(item.quadrant??''); setEditStatus(item.status??'pending'); setEditCat(item.cat??'') }
   const saveEdit=React.useCallback(async(item:any)=>{
@@ -359,8 +462,8 @@ function TodosView({ ctx }: {ctx:any}): React.ReactElement {
       if(editStatus!==item.status) patch.status=editStatus
       if(editCat!==(item.cat??'')) patch.cat=editCat||null
       const res:any=await rpc('todo.mutate',{ action:'update', target:item.target, id:item.id, ...patch })
-      if(res?.ok){ setEditId(null); setMsg(res.message??'updated'); await load() } else setMsg(`update failed: ${res?.message??res?.error}`)
-    } catch(e:any){ setMsg(`error: ${e?.message??String(e)}`) }
+      if(res?.ok){ setEditId(null); ok(res.message??'updated'); await load() } else bad(`update failed: ${res?.message??res?.error}`)
+    } catch(e:any){ bad(`error: ${e?.message??String(e)}`) }
   },[rpc,editContent,editDue,editQuadrant,editStatus,editCat,load])
 
   return React.createElement('div',{className:'memx-panel'},
@@ -369,8 +472,8 @@ function TodosView({ ctx }: {ctx:any}): React.ReactElement {
       React.createElement('div',{className:'memx-search', role:'search', 'aria-label':'Filter todos'}, React.createElement(Ico,{d:ICO.search}), React.createElement('input',{value:q, onChange:(e:any)=>setQ(e.target.value), placeholder:'Filter todos…', 'aria-label':'Filter todos'})),
     ),
     React.createElement('div',{className:'memx-toolbar'},
-      React.createElement('label',{style:{display:'flex',gap:6,alignItems:'center'}}, React.createElement('input',{type:'checkbox', checked:showAll, onChange:(e:any)=>setShowAll(e.target.checked), 'data-testid':'todo-all'}), 'all'),
-      React.createElement('label',{style:{display:'flex',gap:6,alignItems:'center'}}, React.createElement('input',{type:'checkbox', checked:showPast, onChange:(e:any)=>setShowPast(e.target.checked), 'data-testid':'todo-past'}), 'past'),
+      React.createElement('label',{style:{display:'flex',gap:6,alignItems:'center'}}, React.createElement('input',{type:'checkbox', checked:showAll, onChange:(e:any)=>setShowAll(e.target.checked), 'data-testid':'todo-all'}), 'all statuses'),
+      React.createElement('label',{style:{display:'flex',gap:6,alignItems:'center'}}, React.createElement('input',{type:'checkbox', checked:showPast, onChange:(e:any)=>setShowPast(e.target.checked), 'data-testid':'todo-past'}), 'past days'),
       React.createElement('label',{style:{display:'flex',gap:6,alignItems:'center'}}, React.createElement('input',{type:'checkbox', checked:showExpired, onChange:(e:any)=>setShowExpired(e.target.checked), 'data-testid':'todo-expired'}), 'expired'),
       React.createElement('button',{onClick:load, className:'memx-btn memx-btn-ghost', 'data-testid':'todo-refresh'}, React.createElement(Ico,{d:ICO.refresh}), 'Refresh'),
     ),
@@ -391,7 +494,7 @@ function TodosView({ ctx }: {ctx:any}): React.ReactElement {
         React.createElement('button',{onClick:addTodo, className:'memx-btn memx-btn-primary', 'data-testid':'todo-add-btn'}, 'Add'),
       ) : null,
     ),
-    msg ? React.createElement('div',{className:'memx-muted', style:{whiteSpace:'pre-wrap'}}, msg) : null,
+    React.createElement(MemStatus,{text:msg, tone: msgErr?'error':'info'}),
     loading ? React.createElement('div',{className:'memx-muted'}, 'Loading todos…') : filtered.length===0 ? React.createElement('div',{className:'memx-empty'}, 'No todos — try "all" or change filter.') :
       React.createElement('div',null,
         React.createElement('div',{className:'memx-muted', style:{marginBottom:6}}, `${filtered.length} todos${!showAll && filtered.length===8?' (smart view ≤8)':''}`),
@@ -437,11 +540,14 @@ function SkillsView({ ctx }: {ctx:any}): React.ReactElement {
   const [entries,setEntries]=React.useState<any[]>([])
   const [loading,setLoading]=React.useState(true)
   const [msg,setMsg]=React.useState('')
+  const [msgErr,setMsgErr]=React.useState(false)
+  const ok=React.useCallback((t:string)=>{ setMsgErr(false); setMsg(t) },[])
+  const bad=React.useCallback((t:string)=>{ setMsgErr(true); setMsg(t) },[])
   const [q,setQ]=React.useState('')
   const load=React.useCallback(async()=>{
-    setLoading(true); setMsg('')
-    try{ const res:any=await rpc('skills.list',{}); if(res?.ok){ setEntries(Array.isArray(res.entries)?res.entries:[]); if(res.entries.length===0) setMsg('No skills found') } else setMsg(`load failed: ${res?.error??'unknown'}`) }
-    catch(e:any){ setMsg(`error: ${e?.message??String(e)}`) } finally{ setLoading(false) }
+    setLoading(true); ok('')
+    try{ const res:any=await rpc('skills.list',{}); if(res?.ok){ setEntries(Array.isArray(res.entries)?res.entries:[]); } else bad(`load failed: ${res?.error??'unknown'}`) }
+    catch(e:any){ bad(`error: ${e?.message??String(e)}`) } finally{ setLoading(false) }
   },[rpc])
   React.useEffect(()=>{ load() },[load])
   const filtered=React.useMemo(()=>{
@@ -455,16 +561,16 @@ function SkillsView({ ctx }: {ctx:any}): React.ReactElement {
       React.createElement('button',{onClick:load, className:'memx-btn memx-btn-ghost', 'data-testid':'skills-refresh'}, React.createElement(Ico,{d:ICO.refresh}), 'Refresh'),
     ),
     React.createElement('div',{className:'memx-muted'}, `${filtered.length}/${entries.length} skills — read-only, no mutation`),
-    filtered.length===0 ? React.createElement('div',{className:'memx-empty'}, msg||'No skills') :
+    filtered.length===0 ? React.createElement('div',{className:'memx-empty'}, 'No skills found') :
       React.createElement('div',{className:'memx-grid memx-grid-2'},
         ...filtered.map((e:any)=> React.createElement('div',{key:e.name, className:'memx-card'},
           React.createElement('div',{className:'memx-cardtitle', style:{display:'flex',gap:8,alignItems:'center'}}, React.createElement(Ico,{d:ICO.layers, size:14}), e.name),
-          React.createElement('div',{className:'memx-sm'}, `[${e.origin}] ${e.path}`),
+          React.createElement('div',{className:'memx-sm', title:e.path}, `[${e.origin}] ${shortPath(e.path)}`),
           React.createElement('div',{className:'memx-pre-sm'}, e.description),
           e.metadata && Object.keys(e.metadata).length>0 ? React.createElement('div',{className:'memx-xs'}, `metadata: ${Object.entries(e.metadata).map(([k,v])=>`${k}=${String(v).slice(0,40)}`).join(', ')}`) : null,
         ))
       ),
-    msg?React.createElement('div',{className:'memx-muted', style:{marginTop:8}},msg):null,
+    React.createElement(MemStatus,{text:msg, tone: msgErr?'error':'info'}),
   )
 }
 
@@ -476,6 +582,9 @@ function MemoryListView({ ctx }: {ctx:any}): React.ReactElement {
   const [entries,setEntries]=React.useState<string[]>([])
   const [loading,setLoading]=React.useState(true)
   const [msg,setMsg]=React.useState('')
+  const [msgErr,setMsgErr]=React.useState(false)
+  const ok=React.useCallback((t:string)=>{ setMsgErr(false); setMsg(t) },[])
+  const bad=React.useCallback((t:string)=>{ setMsgErr(true); setMsg(t) },[])
   const [q,setQ]=React.useState('')
   // Drafts are bucketed per track: switching tabs must not discard typed text.
   const [drafts,setDrafts]=React.useState<Record<string,string>>({})
@@ -484,12 +593,12 @@ function MemoryListView({ ctx }: {ctx:any}): React.ReactElement {
   const draft=drafts[track]??''
   const canAdd=draft.trim().length>0 && (!needsCwd || cwd.trim().length>0) && !saving
   const load=React.useCallback(async()=>{
-    setLoading(true); setMsg('')
+    setLoading(true); ok('')
     try{
-      if(needsCwd && !cwd.trim()){ setEntries([]); setMsg('cwd required for key/project'); setLoading(false); return }
+      if(needsCwd && !cwd.trim()){ setEntries([]); bad('cwd required for key/project'); setLoading(false); return }
       const res:any=await rpc('memory.list',{ target:track, cwd: needsCwd?cwd.trim():undefined })
       setEntries(Array.isArray(res?.entries)?res.entries:[])
-    } catch(e:any){ setMsg(`load failed: ${e?.message??String(e)}`) } finally{ setLoading(false) }
+    } catch(e:any){ bad(`load failed: ${e?.message??String(e)}`) } finally{ setLoading(false) }
   },[rpc,track,cwd,needsCwd])
   React.useEffect(()=>{ load() },[load])
 
@@ -497,18 +606,18 @@ function MemoryListView({ ctx }: {ctx:any}): React.ReactElement {
   // (the key gate is exec.agent-scoped on the host and stays in force there).
   const addEntry=React.useCallback(async()=>{
     const content=draft.trim()
-    if(!content){ setMsg('content required'); return }
-    if(needsCwd && !cwd.trim()){ setMsg('cwd required for key/project'); return }
-    setSaving(true); setMsg('')
+    if(!content){ bad('content required'); return }
+    if(needsCwd && !cwd.trim()){ bad('cwd required for key/project'); return }
+    setSaving(true); ok('')
     try{
       const res:any=await rpc('memory.mutate',{ action:'add', target:track, cwd: needsCwd?cwd.trim():undefined, content })
-      if(res && res.ok===false){ setMsg(`add failed: ${res.error??'unknown error'}`) }
+      if(res && res.ok===false){ bad(`add failed: ${res.error??'unknown error'}`) }
       else{
         setDrafts(prev=>({...prev,[track]:''}))
-        setMsg(`added to ${track}`)
+        ok(`added to ${track}`)
         await load()
       }
-    } catch(e:any){ setMsg(`add failed: ${e?.message??String(e)}`) } finally{ setSaving(false) }
+    } catch(e:any){ bad(`add failed: ${e?.message??String(e)}`) } finally{ setSaving(false) }
   },[rpc,track,cwd,needsCwd,draft,load])
 
   const filtered=React.useMemo(()=>{
@@ -529,7 +638,7 @@ function MemoryListView({ ctx }: {ctx:any}): React.ReactElement {
       React.createElement('textarea',{value:draft, onChange:(e:any)=>setDrafts(prev=>({...prev,[track]:e.target.value})), placeholder:`Add an entry to ${track}…`, 'aria-label':`New ${track} entry`, 'data-testid':'mem-add-content', className:'memx-textarea', rows:2, disabled:saving}),
       React.createElement('button',{onClick:addEntry, disabled:!canAdd, className:'memx-btn memx-btn-primary', 'data-testid':'mem-add-btn', 'aria-label':'Add entry'}, saving?'Saving…':'Add'),
     ),
-    React.createElement('div',{className:'memx-muted memx-status', role:'status', 'aria-live':'polite'}, msg),
+    React.createElement(MemStatus,{text:msg, tone: msgErr?'error':'info'}),
     loading ? React.createElement('div',{className:'memx-muted'},'Loading memory…') : filtered.length===0 ? React.createElement('div',{className:'memx-empty'}, '(no entries)') :
       React.createElement('div',null,
         React.createElement('div',{className:'memx-muted', style:{marginBottom:6}}, `${filtered.length}/${entries.length} entries`),
@@ -546,29 +655,44 @@ function HealthView({ ctx }: {ctx:any}): React.ReactElement {
   const [health,setHealth]=React.useState<any>(null)
   const [loading,setLoading]=React.useState(true)
   const [msg,setMsg]=React.useState('')
+  const [msgErr,setMsgErr]=React.useState(false)
+  const ok=React.useCallback((t:string)=>{ setMsgErr(false); setMsg(t) },[])
+  const bad=React.useCallback((t:string)=>{ setMsgErr(true); setMsg(t) },[])
   const load=React.useCallback(async()=>{
-    setLoading(true); setMsg('')
+    setLoading(true); ok('')
     try{
       const conn=(ctx as any).connection ?? (ctx as any).get?.('connection')
       if(!conn?.rpc?.call) throw new Error('RPC not available')
       const cwd=(ctx as any)?.sessions?.list?.getSnapshot?.()?.byId?.[(ctx as any)?.sessions?.list?.getSnapshot?.()?.current]?.cwd || ''
       const res:any=await conn.rpc.call('/dsh-maestro-memory-health','get',{cwd})
       const val=res?.ok===true?res.value:res
-      if(val && typeof val.project!=='undefined') setHealth(val); else setMsg(`unexpected: ${JSON.stringify(val).slice(0,120)}`)
-    } catch(e:any){ setMsg(`load failed: ${e?.message??String(e)}`) } finally{ setLoading(false) }
-  },[ctx])
+      if(val && typeof val.project!=='undefined') setHealth(val); else bad(`unexpected: ${JSON.stringify(val).slice(0,120)}`)
+    } catch(e:any){ bad(`load failed: ${e?.message??String(e)}`) } finally{ setLoading(false) }
+  },[ctx,ok,bad])
   React.useEffect(()=>{ load() },[load])
-  if(loading) return React.createElement('div',{className:'memx-muted'},'Loading health…')
-  if(msg && !health) return React.createElement('div',null, React.createElement('div',{style:{color:'var(--dsw-alias-state-error-primary)'}},msg), React.createElement('button',{onClick:load, className:'memx-btn', style:{marginTop:8}},'Retry'))
-  if(!health) return React.createElement('div',null, msg ? React.createElement('div',{style:{color:'var(--dsw-alias-state-error-primary)', marginBottom:8}},msg) : null, React.createElement('div',{className:'memx-muted'},'No data'), React.createElement('button',{onClick:load, className:'memx-btn', style:{marginTop:8}},'Retry'))
-  const cov=health.project.coverage as number
-  const covColor = cov>=90 ? 'var(--dsw-alias-state-success-primary)' : cov>=50 ? 'var(--dsw-alias-state-warn-primary)' : 'var(--dsw-alias-state-error-primary)'
+
+  // One toolbar slot for every section: refresh sits top-right, not at the bottom.
+  const toolbar = React.createElement('div',{className:'memx-toolbar'},
+    React.createElement('span',{className:'memx-muted'}, 'Read-only snapshot of the durable store'),
+    React.createElement('button',{onClick:load, className:'memx-btn memx-btn-ghost', 'data-testid':'health-refresh', style:{marginLeft:'auto'}}, React.createElement(Ico,{d:ICO.refresh, size:14}), 'Refresh'),
+  )
+
+  if(loading) return React.createElement('div',{className:'memx-panel'}, toolbar,
+    React.createElement('div',{className:'memx-muted'},'Loading health…'))
+  if(!health) return React.createElement('div',{className:'memx-panel'}, toolbar,
+    React.createElement(MemStatus,{text: msg || 'No data', tone: msgErr ? 'error' : 'info'}))
+
+  // Coverage is undefined for an empty project: the host answers 100 for
+  // total === 0, which used to render as a green "100.0% PASS" beside
+  // "0 entries" (audit F3). The value also sits on a tinted chip now, because
+  // the raw state colours as text measured 2.28:1 (success) on light (F4).
+  const cov = coverageSummary(Number(health.project.total), Number(health.project.withSummary))
   return React.createElement('div',{className:'memx-panel'},
-    React.createElement('div',{className:'memx-grid memx-grid-4'},
+    toolbar,
+    React.createElement('div',{className:'memx-grid memx-grid-3'},
       React.createElement('div',{className:'memx-card memx-stat'}, React.createElement('div',{className:'memx-kicker'},'Project entries'), React.createElement('div',{className:'memx-statval'}, String(health.project.total)), React.createElement('div',{className:'memx-sm'}, `${health.project.withSummary} with summary`)),
-      React.createElement('div',{className:'memx-card memx-stat'}, React.createElement('div',{className:'memx-kicker'},'Coverage'), React.createElement('div',{className:'memx-statval', style:{color:covColor}}, `${cov.toFixed(1)}%`), React.createElement('div',{className:'memx-sm'}, cov>=90?'PASS':'FAIL (<90%)')),
-      React.createElement('div',{className:'memx-card memx-stat'}, React.createElement('div',{className:'memx-kicker'},'Daily last 7d'), React.createElement('div',{style:{fontWeight:600}}, (health.daily.counts as number[]).join(' · ')), React.createElement('div',{className:'memx-sm'}, 'entries per day')),
-      React.createElement('div',{className:'memx-card memx-stat'}, React.createElement('div',{className:'memx-kicker'},'Discipline'), React.createElement('div',{style:{fontWeight:600}}, '1.5 avg / session'), React.createElement('div',{className:'memx-sm'}, 'target 1+')),
+      React.createElement('div',{className:'memx-card memx-stat'}, React.createElement('div',{className:'memx-kicker'},'Coverage'), React.createElement('div',{className:'memx-statval'}, React.createElement('span',{className:'memx-stat-value', 'data-state':cov.state}, cov.value)), React.createElement('div',{className:'memx-sm'}, cov.caption)),
+      React.createElement('div',{className:'memx-card memx-stat'}, React.createElement('div',{className:'memx-kicker'},'Daily last 7d'), React.createElement('div',{style:{fontWeight:600}}, seriesText(health.daily.counts as number[])), React.createElement('div',{className:'memx-sm'}, 'entries per day')),
     ),
     health.fiveDim?React.createElement('div',{className:'memx-card'},
       React.createElement('div',{className:'memx-dim-head'},
@@ -588,13 +712,12 @@ function HealthView({ ctx }: {ctx:any}): React.ReactElement {
           try{
             let cwd = ''
             try { const snap:any=(ctx as any)?.sessions?.list?.getSnapshot?.(); const cur=snap?.current as string|undefined; cwd = cur ? (snap?.byId?.[cur]?.cwd as string) ?? '' : '' } catch {}
-            const res:any=await rpc('queue.propose',{content:it.preview, reason:'promote from Health longest', cwd}); setMsg(res?.queued?`proposed (queue ${res.queued})`:`proposed: ${JSON.stringify(res).slice(0,80)}`)
-          } catch(e:any){ setMsg(`propose failed: ${e?.message??String(e)}`) }
+            const res:any=await rpc('queue.propose',{content:it.preview, reason:'promote from Health longest', cwd}); ok(res?.queued?`proposed (queue ${res.queued})`:`proposed: ${JSON.stringify(res).slice(0,80)}`)
+          } catch(e:any){ bad(`propose failed: ${e?.message??String(e)}`) }
         }, className:'memx-btn memx-btn-primary', 'data-testid':`health-propose-${i}`, style:{whiteSpace:'nowrap', flex:'none'}}, 'Suggest as KEY'),
       )),
     ),
-    msg?React.createElement('div',{className:'memx-muted', style:{whiteSpace:'pre-wrap'}},msg):null,
-    React.createElement('button',{onClick:load, className:'memx-btn', style:{marginTop:4}, 'data-testid':'health-refresh'}, React.createElement(Ico,{d:ICO.refresh, size:14}), 'Refresh'),
+    React.createElement(MemStatus,{text:msg, tone: msgErr?'error':'info'}),
   )
 }
 
@@ -629,6 +752,25 @@ function MemoryView({ ctx }: {ctx:any}): React.ReactElement {
     if(outer) outer.scrollTop = 0
   },[tab])
 
+  // Audit F17: the five section buttons carried role=tab without the keyboard
+  // behaviour the role promises (every tab a Tab stop, no arrow keys).
+  const tabOrder = ['memory','review','todos','skills','health'] as const
+  const onNavKey = (e:any)=>{
+    const i = tabOrder.indexOf(tab as any)
+    if (i < 0) return
+    let next = -1
+    if (e.key === 'ArrowDown' || e.key === 'ArrowRight') next = (i + 1) % tabOrder.length
+    else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') next = (i - 1 + tabOrder.length) % tabOrder.length
+    else if (e.key === 'Home') next = 0
+    else if (e.key === 'End') next = tabOrder.length - 1
+    if (next < 0) return
+    e.preventDefault()
+    const id = tabOrder[next]
+    setTab(id as any)
+    const el = document.getElementById(`tab-${id}`)
+    if (el) el.focus()
+  }
+
   const tabs: Array<{id:typeof tab; label:string; icon:string; count?:number}> = [
     {id:'memory', label:'Memory', icon:ICO.mem},
     {id:'review', label:'Queue', icon:ICO.inbox, count:pending},
@@ -644,21 +786,18 @@ function MemoryView({ ctx }: {ctx:any}): React.ReactElement {
         React.createElement('div',{className:'memx-title'}, React.createElement(Ico,{d:ICO.spark, size:18}), 'Memory'),
         React.createElement('div',{className:'memx-subtitle'}, 'Durable layered memory — five tracks, gated writes, todos & skills'),
       ),
-      React.createElement('div',{className:'memx-header-actions'},
-        React.createElement('button',{onClick:refreshPending, className:'memx-iconbtn', 'aria-label':'Refresh status', title:'Refresh'}, React.createElement(Ico,{d:ICO.refresh, size:16})),
-      ),
     ),
     React.createElement('div',{className:'memx-layout'},
       React.createElement('div',{className:'memx-nav', role:'tablist', 'aria-label':'Memory sections'},
         ...tabs.map(t=> React.createElement('button',{
-          key:t.id, role:'tab', id:`tab-${t.id}`, 'aria-selected':tab===t.id, 'aria-controls':`panel-${t.id}`, onClick:()=>setTab(t.id), className:'memx-navitem', 'data-testid':`tab-${t.id}`,
+          key:t.id, role:'tab', id:`tab-${t.id}`, 'aria-selected':tab===t.id, 'aria-controls':`panel-${t.id}`, onClick:()=>setTab(t.id), onKeyDown:onNavKey, tabIndex: tab===t.id ? 0 : -1, className:'memx-navitem', 'data-testid':`tab-${t.id}`,
         },
           React.createElement(Ico,{d:t.icon}), t.label,
           t.count!==undefined && t.count>0 ? React.createElement('span',{className:'memx-badge', 'data-testid':'tab-badge-review'}, String(t.count)) : null,
           t.id==='memory'?React.createElement('span',{className:'memx-navcount'}, '5 tracks'):null,
         )),
       ),
-      React.createElement('div',{className:'memx-panel', role:'tabpanel', id:`panel-${tab}`, 'aria-labelledby':`tab-${tab}`},
+      React.createElement('div',{className:'memx-panel', role:'tabpanel', id:`panel-${tab}`, 'aria-labelledby':`tab-${tab}`, tabIndex:0},
         tab==='memory'?React.createElement(MemoryListView,{ctx}):
         tab==='review'?React.createElement(ReviewQueueView,{ctx, onPendingChange:setPending}):
         tab==='todos'?React.createElement(TodosView,{ctx}):
@@ -680,19 +819,43 @@ export function apply(ctx:any): void {
     if(!conn?.rpc?.call) return ()=>{}
     const BADGE_ATTR='data-dshmem-header-badge'
     const VIEW_ATTR='data-dshmem-memory-tab'
+    // The host exposes no stable id on its view tabs (measured 0.2.2-alpha.2:
+    // <button role="tab"><span class="…_tabLabel">Memory</span></button>), so the
+    // match is the English label (audit F18). If the shell localises, the badge
+    // stops appearing; the data attribute set on first match keeps it working
+    // for the lifetime of the page.
     const findMemoryTab=(): HTMLElement|null=>{
       const tabs=document.querySelectorAll('button[role="tab"]')
       for(const tab of Array.from(tabs)){ if(tab.getAttribute(VIEW_ATTR)==='1') return tab as HTMLElement }
       for(const tab of Array.from(tabs)){ if(tab.closest('.memx')) continue; if((tab.textContent??'').trim()==='Memory'){ tab.setAttribute(VIEW_ATTR,'1'); return tab as HTMLElement } }
       return null
     }
+    const DESCR_ID='dshmem-queue-count'
     const renderBadge=(count:number): void=>{
       const tab=findMemoryTab(); if(!tab) return
       const existing=tab.querySelector(`[${BADGE_ATTR}]`)
-      if(count<=0){ if(existing) existing.remove(); return }
+      const descr=document.getElementById(DESCR_ID)
+      if(count<=0){
+        if(existing) existing.remove()
+        if(descr) descr.remove()
+        tab.removeAttribute('aria-describedby')
+        return
+      }
       if(existing && (existing.textContent===String(count))) return
       if(existing) existing.remove()
-      const badge=document.createElement('span'); badge.setAttribute(BADGE_ATTR,''); badge.className='dshmem-header-badge'; badge.textContent=String(count); tab.appendChild(badge)
+      if(descr) descr.remove()
+      const badge=document.createElement('span')
+      badge.setAttribute(BADGE_ATTR,''); badge.className='dshmem-header-badge'; badge.textContent=String(count)
+      // The count is decoration for sighted users. Without aria-hidden the tab's
+      // accessible name became "Memory 1", a bare digit (audit F10); the number
+      // is exposed through aria-describedby instead.
+      badge.setAttribute('aria-hidden','true')
+      tab.appendChild(badge)
+      const sr=document.createElement('span')
+      sr.id=DESCR_ID; sr.className='dshmem-sr-only'
+      sr.textContent=`${count} pending suggestion${count===1?'':'s'}`
+      tab.appendChild(sr)
+      tab.setAttribute('aria-describedby', DESCR_ID)
     }
     let styleEl=document.getElementById('dshmem-header-style') as HTMLStyleElement|null
     if(!styleEl){ styleEl=document.createElement('style'); styleEl.id='dshmem-header-style'; styleEl.textContent=HEADER_BADGE_CSS; document.head.appendChild(styleEl) }
@@ -709,6 +872,6 @@ export function apply(ctx:any): void {
       if(lastCount>0 && !hasBadge) renderBadge(lastCount); else if(lastCount<=0 && hasBadge) renderBadge(0)
     })
     observer.observe(document.body,{childList:true,subtree:true})
-    return ()=>{ disposed=true; window.clearInterval(timer); observer.disconnect(); styleEl?.remove(); const tab=findMemoryTab(); if(tab) tab.querySelector(`[${BADGE_ATTR}]`)?.remove() }
+    return ()=>{ disposed=true; window.clearInterval(timer); observer.disconnect(); styleEl?.remove(); const tab=findMemoryTab(); if(tab){ tab.querySelector(`[${BADGE_ATTR}]`)?.remove(); document.getElementById(DESCR_ID)?.remove(); tab.removeAttribute('aria-describedby') } }
   },'maestro-memory: header-badge')
 }

@@ -87,20 +87,23 @@ describe('memory view manual add composer', () => {
     expect(css).not.toMatch(/\.memx-btn:hover \{/)
   })
 
-  it('announces the add result through a live status region', () => {
+  it('announces the add result through the shared live status region', () => {
     // Without this the "added to daily" / "add failed" outcome is silent for
-    // screen readers: the message is plain text, not a live region.
-    expect(view).toMatch(/role:'status'/)
-    expect(view).toMatch(/'aria-live':'polite'/)
+    // screen readers. The region lives in one component that every section
+    // renders, so the assertions moved to the component itself (audit F6).
+    const component = src.slice(src.indexOf('function MemStatus'), src.indexOf('// ── Review'))
+    expect(component).toMatch(/role: 'status'/)
+    expect(component).toMatch(/'aria-live': 'polite'/)
+    expect(view).toMatch(/React\.createElement\(MemStatus,/)
   })
 
   it('mounts the live region up front, not only when a message exists', () => {
     // A live region added to the DOM together with its text is unreliable:
-    // assistive tech registers the region, then observes its updates. The
-    // container must therefore exist before there is anything to announce,
-    // which is why it is not behind a `msg ?` guard.
-    expect(view).not.toMatch(/msg\?React\.createElement\('div',\{className:'memx-muted'/)
-    expect(view).toMatch(/memx-status/)
+    // assistive tech registers the region, then observes its updates. MemStatus
+    // always renders its container, so the message is a text update.
+    const component = src.slice(src.indexOf('function MemStatus'), src.indexOf('// ── Review'))
+    expect(component).not.toMatch(/if \(!text\) return null/)
+    expect(component).toMatch(/memx-status/)
   })
 
   it('keeps the empty live region out of layout without leaving the a11y tree', () => {
